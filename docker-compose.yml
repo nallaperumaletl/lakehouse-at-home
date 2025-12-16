@@ -1,0 +1,88 @@
+
+services:
+  
+  # Spark Master
+  spark-master:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-master
+    hostname: spark-master
+    env_file: .env
+    network_mode: "host"
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
+#    ports:
+#      - "8090:8080"  # Spark Master Web UI
+#      - "7077:7077"  # Spark Master
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+#    networks:
+#      - lakehouse
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    command: >
+      bash -c "
+        /opt/spark/sbin/start-master.sh &&
+        tail -f /opt/spark/logs/*
+      "
+
+  # Spark Worker
+  spark-worker:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-worker
+    env_file: .env
+    network_mode: "host"
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=16g
+#    ports:
+#      - "8091:8081"  # Spark Worker Web UI
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./jars:/opt/spark/conf
+      - ./scripts:/scripts
+#    networks:
+#      - lakehouse
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    depends_on:
+      - spark-master
+    command: >
+      bash -c "
+        /opt/spark/sbin/start-worker.sh spark://localhost:7077 &&
+        tail -f /opt/spark/logs/*
+      "
+
+  # Jupyter Lab (for interactive Spark/Python)
+  jupyter:
+    image: jupyter/pyspark-notebook:x86_64-latest
+    container_name: jupyter
+    env_file: .env
+    network_mode: "host"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - SPARK_MASTER=spark://spark-master:7077
+ #   ports:
+ #     - "8889:8888"  # Jupyter
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./config/spark:/opt/spark/conf
+#    networks:
+#      - lakehouse
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    depends_on:
+      - spark-master
+
+networks:
+  lakehouse:
+    driver: bridge

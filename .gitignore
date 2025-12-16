@@ -1,0 +1,43 @@
+# Credentials
+config/spark/spark-defaults.conf
+.env
+credentials.env
+**/credentials*.env
+*.swp
+*.key
+*.pem
+
+# JAR files (use scripts/download-jars.sh to get files)
+jars/*.jars
+
+# data directories
+/data/
+/notebooks
+
+# IDE
+.vscode/
+.idea/
+
+# vim swap files
+*.swo
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.swo
+*.swp
