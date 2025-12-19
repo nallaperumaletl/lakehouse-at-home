@@ -9,7 +9,8 @@ services:
       - ./config/spark:/opt/spark/conf 
       - ./notebooks:/notebooks 
       - ./jars:/opt/spark/jars-extra
-      - ./scripts:/scripts 
+      - ./scripts:/scripts
+      - ./ivy-cache:/root/.ivy2
     command: >
       bash -c "
         /opt/spark/sbin/start-master.sh && 
