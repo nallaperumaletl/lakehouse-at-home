@@ -1,0 +1,36 @@
+services:
+  spark-master-41:
+    images: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+    container_name: spark-master-41
+    network_mode: "host"
+    env_file: .env 
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf 
+      - ./notebooks:/notebooks 
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts 
+    command: >
+      bash -c "
+        /opt/spark/sbin/start-master.sh && 
+        tail -f /opt/spark/logs/* 
+        "
+
+
+  spark-worker-41:
+    image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+    container_name: spark-worker-41
+    env_file: .env 
+    network_mode: "host"
+    volumes: 
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf 
+      - ./notebooks:/notebooks 
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts 
+    command: >
+      bash -c "
+        sleep 5 && 
+        /opt/spark/sbin/start-worker.sh spark://localhost:7077 &&
+        tail -f /opt/spark/logs/*
+        "
