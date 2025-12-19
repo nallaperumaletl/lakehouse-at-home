@@ -1,6 +1,6 @@
 services:
   spark-master-41:
-    images: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+    image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
     container_name: spark-master-41
     network_mode: "host"
     env_file: .env 
