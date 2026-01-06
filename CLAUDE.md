@@ -94,6 +94,13 @@ S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET
 ICEBERG_CATALOG_URI, ICEBERG_WAREHOUSE
 ```
 
+## Credentials
+
+**Important:** Service credentials are stored in `config/spark/spark-defaults.conf` (not tracked in git). When running tests or connecting to services, pull credentials from this file:
+
+- **PostgreSQL:** `spark.sql.catalog.iceberg.jdbc.user` and `spark.sql.catalog.iceberg.jdbc.password`
+- **SeaweedFS/S3:** `spark.hadoop.fs.s3a.access.key` and `spark.hadoop.fs.s3a.secret.key`
+
 ## Critical Version Locks
 
 **Do not upgrade without testing compatibility:**
@@ -108,7 +115,7 @@ ICEBERG_CATALOG_URI, ICEBERG_WAREHOUSE
 | `01-basics.py` | Basic Spark table operations |
 | `02-transformations.py` | Narrow & wide transformations |
 | `03-streaming-basic.py` | Streaming with rate source |
-| `04-kafka-streaming.py` | Kafka streaming (WIP) |
+| `04-kafka-streaming.py` | Kafka streaming with windowed aggregations |
 | `kafka-producer.py` | Synthetic event generator |
 | `test-iceberg.py` | Iceberg connectivity test |
 | `download-jars.sh` | Download required JARs |
