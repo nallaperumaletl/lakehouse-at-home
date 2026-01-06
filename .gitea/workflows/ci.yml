@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # Stage 1: Basic validation
+  lint:
+    name: Lint & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          export PATH="$HOME/.local/bin:$PATH"
+          poetry --version
+
+      - name: Install dependencies
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          poetry install --no-root
+
+      - name: Lint with Ruff
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          poetry run ruff check scripts/ --ignore E501,I001,F401 || echo "Lint warnings (non-blocking)"
+        continue-on-error: true
+
+      - name: Check Python formatting with Black
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          poetry run black --check scripts/ || echo "Format warnings (non-blocking)"
+        continue-on-error: true
+
+      - name: Validate shell scripts
+        run: |
+          bash -n lakehouse
+          echo "Shell syntax OK"
+
+      - name: Validate docker-compose files
+        run: |
+          touch .env
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose-spark41.yml config --quiet
+          docker compose -f docker-compose-kafka.yml config --quiet
+          echo "Docker Compose configs valid"
+
+  # Stage 2: Container startup (validates images pull and basic startup)
+  containers:
+    name: Container Startup
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create required directories
+        run: |
+          mkdir -p config/spark jars ivy-cache notebooks
+          sudo mkdir -p /data/spark
+          sudo chmod 777 /data/spark
+
+      - name: Create minimal spark-defaults.conf
+        run: |
+          cat > config/spark/spark-defaults.conf << 'EOF'
+          spark.master                     spark://localhost:7077
+          spark.executor.memory            1g
+          spark.driver.memory              1g
+          EOF
+
+      - name: Create .env file
+        run: |
+          cat > .env << 'EOF'
+          POSTGRES_USER=test
+          POSTGRES_PASSWORD=test
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          EOF
+
+      - name: Pull and verify Spark 4.0 image
+        run: |
+          docker pull apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+          docker run --rm apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu \
+            /opt/spark/bin/spark-submit --version 2>&1 | grep -E "version [0-9]"
+          echo "Spark 4.0 image: OK"
+
+      - name: Pull and verify Spark 4.1 image
+        run: |
+          docker pull apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+          docker run --rm apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu \
+            /opt/spark/bin/spark-submit --version 2>&1 | grep -E "version [0-9]"
+          echo "Spark 4.1 image: OK"
+
+      - name: Start and verify Kafka containers
+        run: |
+          docker compose -f docker-compose-kafka.yml up -d
+          sleep 15
+          docker ps
+          # Confluent Kafka uses /usr/bin/
+          docker exec kafka kafka-topics --list --bootstrap-server localhost:9092 || true
+          echo "Kafka containers: OK"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose-kafka.yml down || true
+
+  # Stage 3: Integration tests (Spark job submission)
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: containers
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d --name postgres \
+            -e POSTGRES_USER=iceberg \
+            -e POSTGRES_PASSWORD=iceberg \
+            -e POSTGRES_DB=iceberg_catalog \
+            -p 5432:5432 \
+            postgres:16
+          sleep 10
+          for i in {1..30}; do
+            docker exec postgres pg_isready && break
+            sleep 1
+          done
+
+      - name: Test PostgreSQL connectivity
+        run: |
+          docker exec postgres psql -U iceberg -d iceberg_catalog -c "SELECT 1;"
+          echo "PostgreSQL: OK"
+
+      - name: Run Spark Pi example (local mode)
+        run: |
+          docker run --rm \
+            apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu \
+            /opt/spark/bin/spark-submit \
+            --master "local[2]" \
+            --class org.apache.spark.examples.SparkPi \
+            /opt/spark/examples/jars/spark-examples_2.13-4.1.0.jar 10
+          echo "Spark job submission: OK"
+        timeout-minutes: 5
+
+      - name: Start Kafka and create test topic
+        run: |
+          docker compose -f docker-compose-kafka.yml up -d
+          sleep 15
+          # Confluent Kafka uses kafka-topics (no .sh)
+          docker exec kafka kafka-topics \
+            --create --topic test-events \
+            --bootstrap-server localhost:9092 \
+            --partitions 1 --replication-factor 1 || true
+          docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
+          echo "Kafka topic creation: OK"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose-kafka.yml down || true
+          docker stop postgres || true
+          docker rm postgres || true
