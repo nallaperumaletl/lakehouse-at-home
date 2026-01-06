@@ -38,39 +38,41 @@ kafka_df = (
         .load()
         )
 
-# parse JSON from Streaming 
-events_df = events_df.withColumn(
-        "event_timestamp", f.to_timestamp("timestamp", "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
-        )
+# parse JSON from Kafka value column
+parsed_df = kafka_df.select(
+    f.from_json(f.col("value").cast("string"), schema).alias("data")
+).select("data.*")
+
+# convert timestamp string to timestamp type
+events_df = parsed_df.withColumn(
+    "event_timestamp", f.to_timestamp("timestamp", "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+)
 
 #Transformation 1: Calculate Revenue
 events_df = events_df.withColumn("revenue", f.col("price") * f.col("quantity"))
 
 # Transformation 2: Aggregate by product in 30 second intervals
 product_metrics = (
-        events_df.groupBy(F.window("event_timestamp", "30 seconds"), "product")
-        .agg(
-            f.count("*").alias("event_count"), 
-            f.sum("revenue").alias("avg_price"),
-            )
-        .select(
-            f.col("window.start").alias("window_start"), 
-            f.col("window.end".alias("window_end"), 
-            "product", 
-            "event_count",
-            "total.revenue", 
-            "avg_price",
-        )
-)) 
+    events_df.groupBy(f.window("event_timestamp", "30 seconds"), "product")
+    .agg(
+        f.count("*").alias("event_count"),
+        f.sum("revenue").alias("total_revenue"),
+    )
+    .select(
+        f.col("window.start").alias("window_start"),
+        f.col("window.end").alias("window_end"),
+        "product",
+        "event_count",
+        "total_revenue",
+    )
+) 
 
-
-# write to console- temporary and will change later 
+# write to console - temporary and will change later 
 query = (product_metrics.writeStream.outputMode("update") 
          .format("console")
          .option("truncate", False)
          .start()
         ) 
-
 print("Streaming from Kafka... press ctrl+c to stop")
 query.awaitTermination()
 
