@@ -120,6 +120,68 @@ ICEBERG_CATALOG_URI, ICEBERG_WAREHOUSE
 | `test-iceberg.py` | Iceberg connectivity test |
 | `download-jars.sh` | Download required JARs |
 
+## Test Data Generation
+
+Generate realistic food delivery order data for testing batch and streaming workflows.
+
+### CLI Commands
+
+```bash
+./lakehouse testdata generate              # Generate 90-day dataset (~7GB parquet)
+./lakehouse testdata generate --days 7     # Generate 7-day dataset
+./lakehouse testdata load                  # Load parquet into Iceberg tables
+./lakehouse testdata stream --speed 60     # Stream to Kafka at 60x speed
+./lakehouse testdata stats                 # View dataset statistics
+./lakehouse testdata clean                 # Remove generated data
+```
+
+### Data Schema
+
+**Event Types (Order Lifecycle):**
+```
+order_created → kitchen_started → kitchen_finished → order_ready →
+driver_arrived → driver_picked_up → driver_ping (1-5x) → delivered
+```
+
+**Dimension Tables:**
+| Table | Records | Description |
+|-------|---------|-------------|
+| `iceberg.bronze.dim_brands` | 20 | Ghost kitchen brands |
+| `iceberg.bronze.dim_items` | 160 | Menu items (8 per brand) |
+| `iceberg.bronze.dim_categories` | 10 | Food categories |
+| `iceberg.bronze.dim_locations` | 4 | Delivery cities |
+
+**Events Table:**
+| Column | Type | Description |
+|--------|------|-------------|
+| `event_id` | string | UUID |
+| `event_type` | string | One of 8 lifecycle types |
+| `ts` | string | ISO timestamp |
+| `order_id` | string | UUID |
+| `location_id` | int | FK to dim_locations |
+| `sequence` | int | Event order within lifecycle |
+| `body` | string | JSON payload |
+
+### Module Structure
+
+```
+scripts/testdata/
+├── config.py      # Configuration dataclasses
+├── dimensions.py  # Dimension table generators
+├── events.py      # Order lifecycle event generator
+├── chaos.py       # Data quality injection (nulls, dupes, late)
+├── exporter.py    # Parquet batch export
+└── producer.py    # Kafka streaming producer
+```
+
+### Chaos Injection
+
+The generator includes configurable data quality issues:
+- **Null injection:** Random null values in fields
+- **Late events:** Events arriving out of order
+- **Duplicates:** Duplicate event IDs
+- **Malformed JSON:** Invalid JSON in body field
+
 ## Network Configuration
 
 - Services use `network_mode: host` for Docker
