@@ -26,6 +26,10 @@ jars/*.jars
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.venv/
+
+# Loose JAR files at root (should be in jars/)
+/*.jar
 
 # Spark
 spark-warehouse/

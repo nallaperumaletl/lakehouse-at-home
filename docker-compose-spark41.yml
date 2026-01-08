@@ -14,6 +14,7 @@ services:
       - ./jars:/opt/spark/jars-extra
       - ./scripts:/scripts
       - ./ivy-cache:/root/.ivy2
+      - ./data:/data
     command: >
       bash -c "
         /opt/spark/sbin/start-master.sh --host 0.0.0.0 --port 7078 --webui-port 8082 &&
@@ -33,6 +34,7 @@ services:
       - ./notebooks:/notebooks
       - ./jars:/opt/spark/jars-extra
       - ./scripts:/scripts
+      - ./data:/data
     command: >
       bash -c "
         sleep 5 &&

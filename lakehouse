@@ -280,6 +280,61 @@ cmd_consumer() {
         /scripts/test-kafka.py
 }
 
+# Testdata commands
+cmd_testdata() {
+    local subcmd=$1
+    shift
+
+    case $subcmd in
+        generate)
+            header "GENERATING TEST DATA"
+            poetry run python -m scripts.testdata generate "$@"
+            ;;
+        stream)
+            header "STREAMING TO KAFKA"
+            poetry run python -m scripts.testdata stream "$@"
+            ;;
+        load)
+            header "LOADING TO ICEBERG"
+            local master_container=$(get_spark_master_container)
+            if [ -f "data/load_to_iceberg.py" ]; then
+                # Copy load script to scripts dir (which is mounted in container)
+                cp data/load_to_iceberg.py scripts/_load_to_iceberg.py
+                docker exec "$master_container" /opt/spark/bin/spark-submit \
+                    /scripts/_load_to_iceberg.py
+                rm -f scripts/_load_to_iceberg.py
+            else
+                echo -e "${RED}No load script found. Run 'lakehouse testdata generate' first.${NC}"
+                exit 1
+            fi
+            ;;
+        stats)
+            header "TEST DATA STATISTICS"
+            poetry run python -m scripts.testdata stats "$@"
+            ;;
+        clean)
+            header "CLEANING TEST DATA"
+            poetry run python -m scripts.testdata clean "$@"
+            ;;
+        *)
+            echo "Usage: lakehouse testdata <command> [options]"
+            echo ""
+            echo "Commands:"
+            echo "  generate [--days N] [--seed N]    Generate test dataset"
+            echo "  stream [--speed N]                Stream events to Kafka"
+            echo "  load                              Load data into Iceberg tables"
+            echo "  stats                             Show dataset statistics"
+            echo "  clean                             Remove generated data"
+            echo ""
+            echo "Examples:"
+            echo "  lakehouse testdata generate --days 90"
+            echo "  lakehouse testdata stream --speed 60"
+            echo "  lakehouse testdata load"
+            exit 1
+            ;;
+    esac
+}
+
 # Help
 cmd_help() {
     echo "Lakehouse Management CLI"
@@ -295,6 +350,7 @@ cmd_help() {
     echo "  test                Run connectivity tests"
     echo "  producer            Start Kafka event producer"
     echo "  consumer            Start Spark streaming consumer"
+    echo "  testdata <cmd>      Test data generation (generate|stream|load|stats|clean)"
     echo "  help                Show this help"
     echo ""
     echo "Options:"
@@ -304,12 +360,19 @@ cmd_help() {
     echo "  4.0 - Port 7077, UI 8080 (docker-compose.yml)"
     echo "  4.1 - Port 7078, UI 8082 (docker-compose-spark41.yml)"
     echo ""
+    echo "Test Data Commands:"
+    echo "  testdata generate   Generate 90-day dataset (~75K orders)"
+    echo "  testdata stream     Stream events to Kafka with speed multiplier"
+    echo "  testdata load       Load generated data into Iceberg tables"
+    echo "  testdata stats      Show dataset statistics"
+    echo "  testdata clean      Remove generated data"
+    echo ""
     echo "Examples:"
     echo "  lakehouse status"
     echo "  lakehouse start all"
     echo "  lakehouse start spark --version 4.0"
-    echo "  lakehouse logs spark-master --version 4.1"
-    echo "  lakehouse consumer --version 4.0"
+    echo "  lakehouse testdata generate --days 30"
+    echo "  lakehouse testdata stream --speed 100"
 }
 
 # Main
@@ -342,6 +405,9 @@ case ${1:-help} in
         ;;
     consumer)
         cmd_consumer
+        ;;
+    testdata)
+        cmd_testdata "${@:2}"
         ;;
     help|*)
         cmd_help
