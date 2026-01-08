@@ -99,6 +99,43 @@ docker compose -f docker-compose-kafka.yml up -d
 ./lakehouse consumer --version 4.0              # Run consumer on Spark 4.0
 ```
 
+### Test Data Generation
+
+Generate realistic food delivery order data (inspired by [Casper's Kitchens](https://github.com/databricks-solutions/caspers-kitchens)) for testing batch and streaming workflows.
+
+```bash
+# Generate 90-day dataset (~3.7M orders, ~100M events, ~7GB)
+./lakehouse testdata generate
+
+# Load into Iceberg tables
+./lakehouse testdata load
+
+# Stream to Kafka at 60x speed (1 real min = 1 simulated hour)
+./lakehouse testdata stream --speed 60
+
+# View statistics
+./lakehouse testdata stats
+
+# Clean up generated data
+./lakehouse testdata clean
+```
+
+**Generated Tables (Medallion Architecture):**
+
+| Table | Description | Records |
+|-------|-------------|---------|
+| `iceberg.bronze.dim_brands` | Ghost kitchen brands | 20 |
+| `iceberg.bronze.dim_items` | Menu items | 160 |
+| `iceberg.bronze.dim_categories` | Food categories | 10 |
+| `iceberg.bronze.dim_locations` | Delivery cities | 4 |
+| `iceberg.bronze.orders` | Order lifecycle events | ~100M |
+
+**Event Types (Order Lifecycle):**
+```
+order_created → kitchen_started → kitchen_finished → order_ready →
+driver_arrived → driver_picked_up → driver_ping (multiple) → delivered
+```
+
 ### Example Scripts
 
 | Script | Description |
