@@ -22,6 +22,7 @@ services:
       - ./notebooks:/notebooks
       - ./jars:/opt/spark/jars-extra
       - ./scripts:/scripts
+      - ./data:/data
 #    networks:
 #      - lakehouse
 #    extra_hosts:
@@ -48,8 +49,9 @@ services:
     volumes:
       - /data/spark:/opt/spark-data
       - ./config/spark:/opt/spark/conf
-      - ./jars:/opt/spark/conf
+      - ./jars:/opt/spark/jars-extra
       - ./scripts:/scripts
+      - ./data:/data
 #    networks:
 #      - lakehouse
 #    extra_hosts:
