@@ -45,3 +45,10 @@ Thumbs.db
 logs/
 *.swo
 *.swp
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
