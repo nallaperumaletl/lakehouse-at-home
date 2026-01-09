@@ -165,19 +165,31 @@ get_spark_ui_port() {
     esac
 }
 
-# Parse --version flag from args
-parse_version() {
+# Global flags
+JSON_OUTPUT=false
+
+# Parse global flags from args
+parse_flags() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --version)
                 SPARK_VERSION="$2"
                 shift 2
                 ;;
+            --json)
+                JSON_OUTPUT=true
+                shift
+                ;;
             *)
                 shift
                 ;;
         esac
     done
+}
+
+# Legacy alias
+parse_version() {
+    parse_flags "$@"
 }
 
 # Header
@@ -214,8 +226,56 @@ check_container() {
     fi
 }
 
-# Status command
-cmd_status() {
+# Check if service is healthy (silent, returns 0/1)
+is_service_healthy() {
+    local port=$1
+    nc -z localhost "$port" 2>/dev/null
+}
+
+# Check if container is running (silent, returns 0/1)
+is_container_running() {
+    local container=$1
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${container}$"
+}
+
+# Status command - JSON output
+cmd_status_json() {
+    local pg_ok=$(is_service_healthy 5432 && echo "true" || echo "false")
+    local s3_ok=$(is_service_healthy 8333 && echo "true" || echo "false")
+    local spark40_master=$(is_container_running "spark-master" && echo "true" || echo "false")
+    local spark40_worker=$(is_container_running "spark-worker" && echo "true" || echo "false")
+    local spark41_master=$(is_container_running "spark-master-41" && echo "true" || echo "false")
+    local spark41_worker=$(is_container_running "spark-worker-41" && echo "true" || echo "false")
+    local kafka_ok=$(is_container_running "kafka" && echo "true" || echo "false")
+    local zk_ok=$(is_container_running "zookeeper" && echo "true" || echo "false")
+
+    cat <<EOF
+{
+  "services": {
+    "postgresql": $pg_ok,
+    "seaweedfs": $s3_ok
+  },
+  "spark": {
+    "4.0": {
+      "master": $spark40_master,
+      "worker": $spark40_worker
+    },
+    "4.1": {
+      "master": $spark41_master,
+      "worker": $spark41_worker
+    }
+  },
+  "kafka": {
+    "broker": $kafka_ok,
+    "zookeeper": $zk_ok
+  },
+  "all_healthy": $([ "$pg_ok" = "true" ] && [ "$s3_ok" = "true" ] && ([ "$spark41_master" = "true" ] || [ "$spark40_master" = "true" ]) && echo "true" || echo "false")
+}
+EOF
+}
+
+# Status command - human-readable output
+cmd_status_human() {
     header "LAKEHOUSE STATUS"
 
     echo -e "\n${YELLOW}System Services:${NC}"
@@ -247,6 +307,15 @@ cmd_status() {
     echo "  Spark 4.1:   docker-compose-spark41.yml"
     echo "  Kafka:       docker-compose-kafka.yml"
     echo "  Spark conf:  config/spark/spark-defaults.conf"
+}
+
+# Status command dispatcher
+cmd_status() {
+    if [ "$JSON_OUTPUT" = true ]; then
+        cmd_status_json
+    else
+        cmd_status_human
+    fi
 }
 
 # Start command
@@ -649,6 +718,7 @@ cmd_help() {
     echo ""
     echo "Options:"
     echo "  --version 4.0|4.1   Select Spark version (default: 4.1)"
+    echo "  --json              Output status in JSON format (for status command)"
     echo ""
     echo "Spark Versions:"
     echo "  4.0 - Port 7077, UI 8080 (docker-compose.yml)"
@@ -662,7 +732,9 @@ cmd_help() {
     echo "  testdata clean      Remove generated data"
     echo ""
     echo "Examples:"
+    echo "  lakehouse setup"
     echo "  lakehouse status"
+    echo "  lakehouse status --json"
     echo "  lakehouse start all"
     echo "  lakehouse start spark --version 4.0"
     echo "  lakehouse testdata generate --days 30"
