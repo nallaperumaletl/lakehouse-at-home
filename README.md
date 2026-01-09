@@ -108,6 +108,7 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | [Multi-Version Spark](docs/guides/multi-version.md) | Run 4.0 and 4.1 together |
 | [Architecture](docs/architecture.md) | System design |
 | [AWS Deployment](docs/deployment/aws.md) | Cloud production setup |
+| [Databricks Deployment](docs/deployment/databricks.md) | Managed Spark platform |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
 
 ## Architecture

@@ -10,6 +10,7 @@ Welcome to the Lakehouse Stack documentation. This guide covers everything you n
 | [Installation](getting-started/installation.md) | Detailed setup for macOS, Ubuntu, Windows |
 | [CLI Reference](guides/cli-reference.md) | All available commands |
 | [AWS Deployment](deployment/aws.md) | Deploy to production on AWS |
+| [Databricks Deployment](deployment/databricks.md) | Deploy to Databricks |
 
 ## What is Lakehouse Stack?
 
@@ -36,7 +37,8 @@ docs/
 │   └── multi-version.md    # Running Spark 4.0 and 4.1
 ├── deployment/
 │   ├── local.md            # Local development setup
-│   └── aws.md              # AWS production deployment
+│   ├── aws.md              # AWS production deployment
+│   └── databricks.md       # Databricks deployment
 ├── architecture.md         # System design and data flow
 └── troubleshooting.md      # Common issues and solutions
 ```
