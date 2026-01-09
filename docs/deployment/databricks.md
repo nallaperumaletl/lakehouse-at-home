@@ -577,6 +577,21 @@ databricks sql warehouses delete --id <warehouse-id>
 | Governance | Manual | Unity Catalog |
 | Performance | Good | Optimized (Photon) |
 
+## Terraform Deployment
+
+Use the included Terraform templates for automated infrastructure setup:
+
+```bash
+cd terraform-databricks
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
+terraform init
+terraform plan
+terraform apply
+```
+
+See [terraform-databricks/README.md](../../terraform-databricks/README.md) for detailed configuration options.
+
 ## Next Steps
 
 1. [Databricks Documentation](https://docs.databricks.com/)

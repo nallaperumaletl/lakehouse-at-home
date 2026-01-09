@@ -139,7 +139,7 @@ Tables follow medallion architecture:
 
 ## Cloud Deployment
 
-Deploy to AWS with managed services (RDS, S3, EMR, MSK):
+### AWS (EMR + S3 + RDS)
 
 ```bash
 cd terraform
@@ -148,6 +148,16 @@ terraform init && terraform apply
 ```
 
 See [AWS Deployment Guide](docs/deployment/aws.md) | Estimated: $50-500/month
+
+### Databricks
+
+```bash
+cd terraform-databricks
+cp terraform.tfvars.example terraform.tfvars
+terraform init && terraform apply
+```
+
+See [Databricks Deployment Guide](docs/deployment/databricks.md) | Estimated: $100-800/month
 
 ## Contributing
 
