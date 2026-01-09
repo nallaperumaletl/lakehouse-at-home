@@ -35,7 +35,19 @@ A fully open-source, self-hostable data lakehouse for local development and test
 
 **Software**: Docker, Java 17+ (21 for Spark 4.1), Python 3.10+, Poetry
 
-## Quick Start
+## Getting Started
+
+### AI-Assisted Setup
+
+Using Claude Code, Cursor, or another AI coding assistant? Point it at this repo:
+
+```
+Clone https://github.com/lisancao/lakehouse-at-home and follow CLAUDE.md to set up locally.
+```
+
+The agent will use `CLAUDE.md` for context and `./lakehouse setup` to validate prerequisites.
+
+### Manual Setup
 
 ```bash
 # Clone
