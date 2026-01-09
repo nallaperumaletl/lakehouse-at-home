@@ -30,53 +30,76 @@ Kafka 3.6.1 (Streaming)
 - Python 3.10+ with Poetry
 - 20GB disk space for JARs and data
 
+> **New to setup?** See [SETUP.md](SETUP.md) for detailed OS-specific installation instructions.
+
+### PostgreSQL Setup
+
+```bash
+# Ubuntu/Debian
+sudo apt install postgresql-16 postgresql-client-16
+sudo systemctl start postgresql
+
+# macOS
+brew install postgresql@16
+brew services start postgresql@16
+
+# Create database and user
+createuser -P lakehouse              # Set a password
+createdb -O lakehouse iceberg_catalog
+```
+
+### SeaweedFS Setup
+
+```bash
+# Download from https://github.com/seaweedfs/seaweedfs/releases
+# Or install via package manager:
+
+# macOS
+brew install seaweedfs
+
+# Start with S3 API enabled
+weed server -s3 -dir=/var/lib/seaweedfs &
+```
+
+SeaweedFS provides S3-compatible storage on port 8333. No bucket creation needed - they are created automatically.
+
 ## Quick Start
 
-### 1. Clone and Configure
+### 1. Clone and Setup
 
 ```bash
 git clone https://github.com/lisancao/lakehouse-at-home.git
 cd lakehouse-at-home
 
-# Copy environment template
-cp .env.example .env
-nano .env  # Edit with your credentials
-
-# Copy Spark config template
-cp config/spark/spark-defaults.conf.example config/spark/spark-defaults.conf
-nano config/spark/spark-defaults.conf  # Edit with your credentials
+# Run automated setup (validates prereqs, downloads JARs, installs deps)
+./lakehouse setup
 ```
 
-### 2. Download JARs
+The setup command will:
+- Check all prerequisites (Docker, Poetry, etc.)
+- Create `.env` and `spark-defaults.conf` from examples
+- Download required JARs (~860MB)
+- Install Python dependencies
+- Validate configuration
+
+### 2. Configure Credentials
 
 ```bash
-./scripts/download-jars.sh
+# Edit with your PostgreSQL and S3 credentials
+nano .env
+nano config/spark/spark-defaults.conf
 ```
 
-This downloads ~860MB of dependencies (exact versions required for compatibility).
-
-### 3. Install Python Dependencies
+### 3. Start Services
 
 ```bash
-poetry install
-```
-
-### 4. Start Services
-
-```bash
-# Using the CLI
 ./lakehouse start all
-
-# Or manually with Docker Compose
-docker compose -f docker-compose-spark41.yml up -d
-docker compose -f docker-compose-kafka.yml up -d
 ```
 
-### 5. Verify Setup
+### 4. Verify Setup
 
 ```bash
 ./lakehouse test
-./scripts/run-spark-test.sh
 ```
 
 ## Usage
@@ -84,6 +107,7 @@ docker compose -f docker-compose-kafka.yml up -d
 ### CLI Commands
 
 ```bash
+./lakehouse setup                               # Validate environment and install deps
 ./lakehouse status                              # Check all services status
 ./lakehouse start [spark|kafka|all]             # Start services
 ./lakehouse stop [spark|kafka|all]              # Stop services
