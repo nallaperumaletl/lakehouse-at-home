@@ -276,6 +276,29 @@ docker logs kafka
 
 - Application UI: http://localhost:4040 (active job)
 
+## Cloud Deployment
+
+Deploy the lakehouse stack on AWS using managed services:
+
+| Local | AWS Equivalent |
+|-------|----------------|
+| PostgreSQL | Amazon RDS |
+| SeaweedFS | Amazon S3 |
+| Spark | Amazon EMR |
+| Kafka | Amazon MSK |
+
+See [CLOUD.md](CLOUD.md) for detailed instructions and [terraform/](terraform/) for Infrastructure as Code templates.
+
+```bash
+# Quick start with Terraform
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your settings
+terraform init && terraform apply
+```
+
+Estimated costs: ~$50/month (dev) to ~$500/month (production with EMR).
+
 ## License
 
 MIT
