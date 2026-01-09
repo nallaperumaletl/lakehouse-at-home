@@ -406,6 +406,135 @@ cmd_testdata() {
     esac
 }
 
+# Setup command - validates and configures everything
+cmd_setup() {
+    header "LAKEHOUSE SETUP"
+    local has_errors=0
+
+    # Step 1: Check prerequisites
+    echo -e "\n${YELLOW}1. Checking prerequisites...${NC}"
+    if ! check_prerequisites; then
+        echo -e "\n${RED}Please install missing tools before continuing.${NC}"
+        echo "See SETUP.md for installation instructions."
+        has_errors=1
+    else
+        echo -e "${GREEN}✓ All required tools installed${NC}"
+    fi
+
+    # Step 2: Check .env file
+    echo -e "\n${YELLOW}2. Checking configuration files...${NC}"
+    if [ ! -f "$PROJECT_ROOT/.env" ]; then
+        if [ -f "$PROJECT_ROOT/.env.example" ]; then
+            cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
+            echo -e "${YELLOW}!${NC} Created .env from .env.example"
+            echo -e "  ${YELLOW}→ Please edit .env with your credentials${NC}"
+            has_errors=1
+        else
+            echo -e "${RED}✗${NC} Missing .env and .env.example"
+            has_errors=1
+        fi
+    else
+        echo -e "${GREEN}✓${NC} .env exists"
+        # Validate required variables
+        source "$PROJECT_ROOT/.env"
+        local env_ok=1
+        [ -z "$POSTGRES_USER" ] && echo -e "  ${RED}✗${NC} POSTGRES_USER not set" && env_ok=0
+        [ -z "$S3_ACCESS_KEY" ] && echo -e "  ${RED}✗${NC} S3_ACCESS_KEY not set" && env_ok=0
+        [ "$POSTGRES_USER" = "your_username" ] && echo -e "  ${YELLOW}!${NC} POSTGRES_USER still has default value" && env_ok=0
+        [ "$S3_ACCESS_KEY" = "your_access_key_here" ] && echo -e "  ${YELLOW}!${NC} S3_ACCESS_KEY still has default value" && env_ok=0
+        [ $env_ok -eq 1 ] && echo -e "  ${GREEN}✓${NC} Required variables set"
+    fi
+
+    # Step 3: Check Spark config
+    if [ ! -f "$PROJECT_ROOT/config/spark/spark-defaults.conf" ]; then
+        if [ -f "$PROJECT_ROOT/config/spark/spark-defaults.conf.example" ]; then
+            cp "$PROJECT_ROOT/config/spark/spark-defaults.conf.example" "$PROJECT_ROOT/config/spark/spark-defaults.conf"
+            echo -e "${YELLOW}!${NC} Created spark-defaults.conf from example"
+            echo -e "  ${YELLOW}→ Please edit with your S3/PostgreSQL credentials${NC}"
+            has_errors=1
+        else
+            echo -e "${RED}✗${NC} Missing spark-defaults.conf"
+            has_errors=1
+        fi
+    else
+        echo -e "${GREEN}✓${NC} spark-defaults.conf exists"
+    fi
+
+    # Step 4: Check JARs
+    echo -e "\n${YELLOW}3. Checking JAR dependencies...${NC}"
+    local jars_dir="$PROJECT_ROOT/jars"
+    local required_jars=(
+        "iceberg-spark-runtime-4.0_2.13-1.10.0.jar"
+        "hadoop-aws-3.4.1.jar"
+        "aws-java-sdk-bundle-1.12.780.jar"
+        "bundle-2.24.6.jar"
+        "postgresql-42.7.4.jar"
+    )
+    local missing_jars=0
+    for jar in "${required_jars[@]}"; do
+        if [ ! -f "$jars_dir/$jar" ]; then
+            echo -e "  ${RED}✗${NC} Missing $jar"
+            missing_jars=1
+        fi
+    done
+
+    if [ $missing_jars -eq 1 ]; then
+        echo -e "\n${YELLOW}Downloading missing JARs...${NC}"
+        if [ -f "$PROJECT_ROOT/scripts/download-jars.sh" ]; then
+            bash "$PROJECT_ROOT/scripts/download-jars.sh"
+        else
+            echo -e "${RED}✗${NC} download-jars.sh not found"
+            has_errors=1
+        fi
+    else
+        echo -e "${GREEN}✓${NC} All required JARs present"
+    fi
+
+    # Step 5: Install Python dependencies
+    echo -e "\n${YELLOW}4. Installing Python dependencies...${NC}"
+    if check_cmd poetry; then
+        poetry install --quiet && echo -e "${GREEN}✓${NC} Python dependencies installed" || {
+            echo -e "${RED}✗${NC} Poetry install failed"
+            has_errors=1
+        }
+    fi
+
+    # Step 6: Check disk space
+    echo -e "\n${YELLOW}5. Checking disk space...${NC}"
+    local free_gb=$(df -BG "$PROJECT_ROOT" | tail -1 | awk '{print $4}' | tr -d 'G')
+    if [ "$free_gb" -lt 10 ] 2>/dev/null; then
+        echo -e "${YELLOW}!${NC} Low disk space: ${free_gb}GB free (10GB+ recommended)"
+    else
+        echo -e "${GREEN}✓${NC} Disk space OK (${free_gb}GB free)"
+    fi
+
+    # Step 7: Check for port conflicts
+    echo -e "\n${YELLOW}6. Checking for port conflicts...${NC}"
+    local ports_ok=1
+    for port in 5432 8333 9092 7077 7078 8080 8082; do
+        if nc -z localhost $port 2>/dev/null; then
+            case $port in
+                5432) echo -e "  ${GREEN}✓${NC} Port $port in use (PostgreSQL expected)" ;;
+                8333) echo -e "  ${GREEN}✓${NC} Port $port in use (SeaweedFS expected)" ;;
+                *) echo -e "  ${YELLOW}!${NC} Port $port already in use" ;;
+            esac
+        fi
+    done
+
+    # Summary
+    echo -e "\n${BLUE}================================${NC}"
+    if [ $has_errors -eq 0 ]; then
+        echo -e "${GREEN}Setup complete!${NC}"
+        echo -e "\nNext steps:"
+        echo "  1. Start services:  ./lakehouse start all"
+        echo "  2. Run tests:       ./lakehouse test"
+    else
+        echo -e "${YELLOW}Setup incomplete - please address the issues above${NC}"
+        echo -e "\nSee SETUP.md for detailed instructions."
+        return 1
+    fi
+}
+
 # Help
 cmd_help() {
     echo "Lakehouse Management CLI"
@@ -413,6 +542,7 @@ cmd_help() {
     echo "Usage: lakehouse <command> [options] [--version 4.0|4.1]"
     echo ""
     echo "Commands:"
+    echo "  setup               Validate environment and install dependencies"
     echo "  status              Show all services status"
     echo "  start [service]     Start service (spark|kafka|all)"
     echo "  stop [service]      Stop service (spark|kafka|all)"
@@ -451,6 +581,9 @@ cmd_help() {
 parse_version "$@"
 
 case ${1:-help} in
+    setup)
+        cmd_setup
+        ;;
     status)
         cmd_status
         ;;
