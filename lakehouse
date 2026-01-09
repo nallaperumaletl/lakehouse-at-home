@@ -5,6 +5,13 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
+# Load environment variables from .env if it exists
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -243,7 +250,10 @@ cmd_test() {
     local master_container=$(get_spark_master_container)
 
     echo -e "${YELLOW}1. Testing PostgreSQL connection...${NC}"
-    psql -h localhost -U lnc -d iceberg_catalog -c "SELECT 1;" || echo -e "${RED}Failed${NC}"
+    local pg_user="${POSTGRES_USER:-postgres}"
+    local pg_host="${POSTGRES_HOST:-localhost}"
+    pg_host="${pg_host/host.docker.internal/localhost}"  # Convert Docker hostname to localhost
+    psql -h "$pg_host" -U "$pg_user" -d iceberg_catalog -c "SELECT 1;" 2>/dev/null && echo -e "${GREEN}OK${NC}" || echo -e "${RED}Failed - check POSTGRES_USER in .env${NC}"
 
     echo -e "\n${YELLOW}2. Testing SeaweedFS...${NC}"
     curl -s http://localhost:8333 > /dev/null && echo -e "${GREEN}OK${NC}" || echo -e "${RED}Failed${NC}"
