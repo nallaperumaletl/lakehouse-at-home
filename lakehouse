@@ -307,23 +307,75 @@ cmd_logs() {
 
 # Test command
 cmd_test() {
+    set +e  # Disable exit on error for tests
     header "RUNNING TESTS"
     local master_container=$(get_spark_master_container)
+    local failures=0
 
     echo -e "${YELLOW}1. Testing PostgreSQL connection...${NC}"
     local pg_user="${POSTGRES_USER:-postgres}"
+    local pg_pass="${POSTGRES_PASSWORD:-}"
     local pg_host="${POSTGRES_HOST:-localhost}"
     pg_host="${pg_host/host.docker.internal/localhost}"  # Convert Docker hostname to localhost
-    psql -h "$pg_host" -U "$pg_user" -d iceberg_catalog -c "SELECT 1;" 2>/dev/null && echo -e "${GREEN}OK${NC}" || echo -e "${RED}Failed - check POSTGRES_USER in .env${NC}"
+    if PGPASSWORD="$pg_pass" psql -h "$pg_host" -U "$pg_user" -d iceberg_catalog -c "SELECT 1;" >/dev/null 2>&1; then
+        echo -e "   ${GREEN}✓${NC} PostgreSQL connected"
+    else
+        echo -e "   ${RED}✗${NC} PostgreSQL failed"
+        echo -e "   ${YELLOW}→ Check: systemctl status postgresql${NC}"
+        echo -e "   ${YELLOW}→ Verify POSTGRES_USER in .env matches your database user${NC}"
+        ((failures++))
+    fi
 
-    echo -e "\n${YELLOW}2. Testing SeaweedFS...${NC}"
-    curl -s http://localhost:8333 > /dev/null && echo -e "${GREEN}OK${NC}" || echo -e "${RED}Failed${NC}"
+    echo -e "\n${YELLOW}2. Testing SeaweedFS (S3)...${NC}"
+    if curl -s --connect-timeout 5 http://localhost:8333 > /dev/null 2>&1; then
+        echo -e "   ${GREEN}✓${NC} SeaweedFS responding"
+    else
+        echo -e "   ${RED}✗${NC} SeaweedFS not responding on port 8333"
+        echo -e "   ${YELLOW}→ Check if SeaweedFS is running${NC}"
+        ((failures++))
+    fi
 
     echo -e "\n${YELLOW}3. Testing Kafka...${NC}"
-    docker exec kafka kafka-topics --list --bootstrap-server localhost:9092 2>/dev/null && echo -e "${GREEN}OK${NC}" || echo -e "${RED}Failed${NC}"
+    if docker ps --format '{{.Names}}' | grep -q '^kafka$'; then
+        if docker exec kafka kafka-topics --list --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} Kafka broker healthy"
+        else
+            echo -e "   ${RED}✗${NC} Kafka broker not responding"
+            echo -e "   ${YELLOW}→ Check: docker logs kafka${NC}"
+            ((failures++))
+        fi
+    else
+        echo -e "   ${RED}✗${NC} Kafka container not running"
+        echo -e "   ${YELLOW}→ Run: ./lakehouse start kafka${NC}"
+        ((failures++))
+    fi
 
-    echo -e "\n${YELLOW}4. Testing Spark $SPARK_VERSION ($master_container)...${NC}"
-    docker exec "$master_container" /opt/spark/bin/spark-submit --version 2>&1 | grep version || echo -e "${RED}Failed${NC}"
+    echo -e "\n${YELLOW}4. Testing Spark $SPARK_VERSION...${NC}"
+    if docker ps --format '{{.Names}}' | grep -q "^${master_container}$"; then
+        if docker exec "$master_container" /opt/spark/bin/spark-submit --version >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} Spark master healthy ($master_container)"
+        else
+            echo -e "   ${RED}✗${NC} Spark not responding"
+            echo -e "   ${YELLOW}→ Check: docker logs $master_container${NC}"
+            ((failures++))
+        fi
+    else
+        echo -e "   ${RED}✗${NC} Spark container not running ($master_container)"
+        echo -e "   ${YELLOW}→ Run: ./lakehouse start spark${NC}"
+        ((failures++))
+    fi
+
+    # Summary
+    set -e  # Re-enable exit on error
+    echo -e "\n${BLUE}================================${NC}"
+    if [ $failures -eq 0 ]; then
+        echo -e "${GREEN}All tests passed!${NC}"
+        return 0
+    else
+        echo -e "${RED}$failures test(s) failed${NC}"
+        echo -e "Run ${YELLOW}./lakehouse setup${NC} to diagnose issues"
+        return 1
+    fi
 }
 
 # Producer command
