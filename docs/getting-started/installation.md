@@ -1,16 +1,8 @@
-# Lakehouse Stack Setup Guide
+# Installation Guide
 
 This guide walks you through setting up the lakehouse stack from scratch. Follow the instructions for your operating system.
 
-## Quick Start
-
-If you already have all prerequisites installed:
-
-```bash
-./lakehouse setup    # Validate environment and install dependencies
-./lakehouse start all    # Start all services
-./lakehouse test         # Verify everything works
-```
+> **Quick Start**: If you already have prerequisites installed, see [Quickstart](quickstart.md).
 
 ## Prerequisites
 
@@ -213,85 +205,7 @@ Inside WSL2 Ubuntu terminal, follow the Ubuntu/Debian setup above starting from 
 
 ---
 
-## Troubleshooting
-
-### PostgreSQL Connection Failed
-
-```bash
-# Check if PostgreSQL is running
-systemctl status postgresql  # Linux
-brew services list           # macOS
-
-# Check pg_hba.conf allows local connections
-sudo nano /etc/postgresql/16/main/pg_hba.conf
-# Ensure this line exists:
-# local   all   all   md5
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql
-```
-
-### SeaweedFS Not Responding
-
-```bash
-# Check if process is running
-pgrep -a weed
-
-# Start SeaweedFS
-weed server -s3 -dir=/tmp/seaweedfs
-
-# Check port 8333
-curl http://localhost:8333
-```
-
-### Docker Permission Denied
-
-```bash
-# Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Or use sudo with docker commands
-```
-
-### JARs Download Failed
-
-```bash
-# Manual download
-cd jars/
-./download-jars.sh
-
-# If wget fails, try curl
-curl -O https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-4.0_2.13/1.10.0/iceberg-spark-runtime-4.0_2.13-1.10.0.jar
-```
-
-### Port Already in Use
-
-```bash
-# Find process using port
-sudo lsof -i :5432  # PostgreSQL
-sudo lsof -i :8333  # SeaweedFS
-sudo lsof -i :9092  # Kafka
-
-# Kill process if needed
-kill -9 <PID>
-```
-
-### Poetry Install Failed
-
-```bash
-# Clear cache and retry
-poetry cache clear . --all
-poetry install
-
-# If lock file issues
-poetry lock --no-update
-poetry install
-```
-
----
-
-## Verification Checklist
+## Verification
 
 After setup, verify each component:
 
@@ -304,13 +218,8 @@ After setup, verify each component:
 | SeaweedFS | `curl http://localhost:8333` | HTML response |
 | All Services | `./lakehouse test` | All tests pass |
 
----
-
 ## Next Steps
 
-Once setup is complete:
-
-1. **Generate test data**: `./lakehouse testdata generate --days 7`
-2. **Start streaming**: `./lakehouse testdata stream --speed 60`
-3. **View Spark UI**: http://localhost:8082
-4. **Explore scripts**: See `scripts/` directory for examples
+- [Quickstart](quickstart.md) - Get the stack running
+- [Configuration](configuration.md) - Customize settings
+- [Troubleshooting](../troubleshooting.md) - Common issues and fixes
