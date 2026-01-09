@@ -25,6 +25,16 @@ A fully open-source, self-hostable data lakehouse for local development and test
 | PostgreSQL | 16 | Catalog metadata |
 | SeaweedFS | - | S3-compatible storage |
 
+## Requirements
+
+| Resource | Minimum | Recommended |
+|----------|---------|-------------|
+| RAM | 8 GB | 16 GB |
+| Disk | 20 GB | 50 GB |
+| CPU | 4 cores | 8 cores |
+
+**Software**: Docker, Java 17+ (21 for Spark 4.1), Python 3.10+, Poetry
+
 ## Quick Start
 
 ```bash
