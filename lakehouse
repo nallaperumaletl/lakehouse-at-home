@@ -80,6 +80,47 @@ check_prerequisites() {
     return 0
 }
 
+# Wait for a service to be ready
+wait_for_service() {
+    local name=$1
+    local check_cmd=$2
+    local max_attempts=${3:-30}
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        if eval "$check_cmd" >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} $name ready"
+            return 0
+        fi
+        printf "   Waiting for $name... (%d/%d)\r" $attempt $max_attempts
+        sleep 1
+        ((attempt++))
+    done
+    echo -e "   ${RED}✗${NC} $name failed to start (timeout after ${max_attempts}s)"
+    return 1
+}
+
+# Wait for all services to be healthy
+wait_for_services() {
+    local spark_port=$(get_spark_port)
+    local master_container=$(get_spark_master_container)
+    echo ""
+
+    # Kafka/Zookeeper (if started)
+    if docker ps --format '{{.Names}}' | grep -q '^zookeeper$'; then
+        wait_for_service "Zookeeper" "nc -z localhost 2181" 30
+    fi
+    if docker ps --format '{{.Names}}' | grep -q '^kafka$'; then
+        wait_for_service "Kafka" "nc -z localhost 9092" 30
+    fi
+
+    # Spark (if started)
+    if docker ps --format '{{.Names}}' | grep -q "^${master_container}$"; then
+        wait_for_service "Spark Master" "nc -z localhost $spark_port" 30
+        wait_for_service "Spark UI" "curl -s http://localhost:$(get_spark_ui_port) >/dev/null" 30
+    fi
+}
+
 # Default Spark version
 SPARK_VERSION="4.1"
 
@@ -239,10 +280,10 @@ cmd_start() {
             ;;
     esac
 
-    if [ "$service" = "all" ]; then
+    if [ "$service" = "all" ] || [ "$service" = "spark" ] || [ "$service" = "kafka" ]; then
         echo -e "\n${YELLOW}Waiting for services to be ready...${NC}"
-        sleep 10
-        cmd_status
+        wait_for_services
+        echo ""
     fi
 }
 
