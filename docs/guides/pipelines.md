@@ -38,10 +38,24 @@ Interactive Jupyter notebooks for learning:
 | `notebooks/spark40_imperative_pipeline.ipynb` | Traditional PySpark |
 | `notebooks/spark41_declarative_pipeline.ipynb` | Spark Declarative Pipelines |
 
-Start JupyterLab to run them:
+### Running the Notebooks
+
+Start JupyterLab using Docker:
 
 ```bash
-poetry run jupyter lab --port 8889
+# Start Jupyter (requires Spark to be running)
+docker compose -f docker-compose-notebooks.yml up -d
+
+# Get the access token
+docker logs jupyter 2>&1 | grep token
+
+# Open http://localhost:8889 and enter the token
+```
+
+Stop when done:
+
+```bash
+docker compose -f docker-compose-notebooks.yml down
 ```
 
 **Tip:** Open both notebooks side-by-side in JupyterLab to compare approaches.

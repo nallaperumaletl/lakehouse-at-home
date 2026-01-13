@@ -1,0 +1,26 @@
+# Jupyter Lab for running workshop notebooks
+#
+# Usage:
+#   docker compose -f docker-compose-notebooks.yml up -d
+#   docker logs jupyter 2>&1 | grep token   # Get access token
+#   # Open http://localhost:8889
+#   docker compose -f docker-compose-notebooks.yml down
+#
+# Note: Uses host network mode to connect to Spark (also on host network)
+
+services:
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: jupyter
+    network_mode: "host"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./scripts:/home/jovyan/scripts
+      - ./data:/home/jovyan/data
+      - ./jars:/home/jovyan/jars
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_PORT=8889
+      # Spark connects via localhost since both use host network
+      - SPARK_MASTER=spark://localhost:7078
+    working_dir: /home/jovyan/notebooks
