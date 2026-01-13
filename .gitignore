@@ -12,7 +12,6 @@ jars/*.jars
 
 # data directories
 /data/
-/notebooks
 
 # IDE
 .vscode/
