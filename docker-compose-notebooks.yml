@@ -2,17 +2,20 @@
 #
 # Usage:
 #   docker compose -f docker-compose-notebooks.yml up -d
-#   docker logs jupyter 2>&1 | grep token   # Get access token
-#   # Open http://localhost:8889
+#   # Open http://localhost:8889 (no token required)
 #   docker compose -f docker-compose-notebooks.yml down
 #
-# Note: Uses host network mode to connect to Spark (also on host network)
+# Notes:
+# - Notebooks run Spark in local mode for learning/demonstration
+# - For cluster execution, use the standalone scripts via spark-submit:
+#   docker exec spark-master-41 spark-submit /scripts/pipeline_spark41.py
 
 services:
   jupyter:
     image: jupyter/pyspark-notebook:spark-3.5.0
     container_name: jupyter
     network_mode: "host"
+    user: root
     volumes:
       - ./notebooks:/home/jovyan/notebooks
       - ./scripts:/home/jovyan/scripts
@@ -21,6 +24,12 @@ services:
     environment:
       - JUPYTER_ENABLE_LAB=yes
       - JUPYTER_PORT=8889
-      # Spark connects via localhost since both use host network
-      - SPARK_MASTER=spark://localhost:7078
+      - GRANT_SUDO=yes
+      - NB_USER=jovyan
+      # Use Spark's bundled version (3.5.0) in local mode for notebooks
+      - SPARK_HOME=/usr/local/spark
+      - PYTHONPATH=/usr/local/spark/python:/usr/local/spark/python/lib/py4j-0.10.9.7-src.zip
     working_dir: /home/jovyan/notebooks
+    command: >
+      bash -c "pip install pyarrow --quiet &&
+               start-notebook.py --NotebookApp.token='' --NotebookApp.password='' --allow-root"
