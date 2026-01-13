@@ -8,7 +8,7 @@ credentials.env
 *.pem
 
 # JAR files (use scripts/download-jars.sh to get files)
-jars/*.jars
+jars/*.jar
 
 # data directories
 /data/

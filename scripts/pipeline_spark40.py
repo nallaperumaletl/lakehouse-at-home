@@ -7,11 +7,14 @@ Traditional PySpark pipeline using explicit function calls and write statements.
 This is the "classic" approach that works with any Spark version.
 
 Usage:
-    # On Spark 4.0 cluster
-    docker exec spark-master /opt/spark/bin/spark-submit /scripts/pipeline_spark40.py
+    # On Spark 4.0 cluster (requires master URL and vectorization disabled for large datasets)
+    docker exec spark-master /opt/spark/bin/spark-submit \\
+        --master spark://spark-master:7077 \\
+        --conf spark.sql.iceberg.vectorization.enabled=false \\
+        /scripts/pipeline_spark40.py
 
-    # On Spark 4.1 cluster (also works)
-    docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/pipeline_spark40.py
+    # On Spark 4.1 cluster (also works, no special flags needed)
+    docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/pipeline_spark41.py
 """
 
 from pyspark.sql import SparkSession
