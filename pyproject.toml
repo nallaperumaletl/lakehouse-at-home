@@ -77,8 +77,13 @@ markers = [
     "slow: mark test as slow-running",
     "spark40: mark test for Spark 4.0 only",
     "spark41: mark test for Spark 4.1 only",
+    "security: mark test as security-focused",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", "notebooks", ".venv"]
+skips = ["B101"]  # Skip assert warnings in non-test code

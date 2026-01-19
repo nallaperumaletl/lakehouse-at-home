@@ -1,11 +1,24 @@
-# Credentials
+# Credentials and Secrets
 config/spark/spark-defaults.conf
+config/spark/spark-defaults-uc.conf
 .env
+.env.*
+!.env.example
 credentials.env
 **/credentials*.env
-*.swp
 *.key
 *.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+.secrets.baseline
+**/secrets/
+**/.secrets/
+
+# AWS credentials
+.aws/
+aws-credentials*
 
 # JAR files (use scripts/download-jars.sh to get files)
 jars/*.jar

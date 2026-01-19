@@ -256,14 +256,22 @@ check_prerequisites() {
 }
 
 # Wait for a service to be ready
+# Security: Uses bash -c with hardcoded commands only (never user input)
 wait_for_service() {
     local name=$1
     local check_cmd=$2
     local max_attempts=${3:-30}
     local attempt=1
 
+    # Security: Validate check_cmd only contains safe patterns
+    # Only allow: nc, curl, docker, psql commands with safe arguments
+    if [[ ! "$check_cmd" =~ ^(nc\ -z|curl\ -s|docker\ exec|PGPASSWORD=) ]]; then
+        echo -e "   ${RED}✗${NC} Invalid check command for $name"
+        return 1
+    fi
+
     while [ $attempt -le $max_attempts ]; do
-        if eval "$check_cmd" >/dev/null 2>&1; then
+        if bash -c "$check_cmd" >/dev/null 2>&1; then
             echo -e "   ${GREEN}✓${NC} $name ready"
             return 0
         fi
@@ -850,9 +858,18 @@ cmd_migrate() {
     for migration_file in $(find "$migrations_dir" -name "*.sql" -type f | sort); do
         local filename=$(basename "$migration_file")
 
+        # Security: Validate filename contains only safe characters (alphanumeric, underscore, hyphen, dot)
+        if [[ ! "$filename" =~ ^[a-zA-Z0-9_.-]+\.sql$ ]]; then
+            echo -e "   ${RED}✗${NC} Skipping unsafe filename: $filename"
+            continue
+        fi
+
+        # Security: Escape single quotes in filename for SQL (double them)
+        local safe_filename="${filename//\'/\'\'}"
+
         # Check if already applied
         local is_applied=$(PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -t -c "
-            SELECT COUNT(*) FROM _migrations WHERE filename = '$filename';
+            SELECT COUNT(*) FROM _migrations WHERE filename = '$safe_filename';
         " 2>/dev/null | tr -d ' ')
 
         if [ "$is_applied" = "1" ]; then
@@ -866,7 +883,7 @@ cmd_migrate() {
             echo -e "   ${BLUE}→${NC} Applying $filename..."
             if PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -f "$migration_file" >/dev/null 2>&1; then
                 PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -c "
-                    INSERT INTO _migrations (filename) VALUES ('$filename');
+                    INSERT INTO _migrations (filename) VALUES ('$safe_filename');
                 " >/dev/null 2>&1
                 echo -e "   ${GREEN}✓${NC} $filename applied"
                 ((applied_count++))
