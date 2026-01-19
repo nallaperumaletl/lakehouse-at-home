@@ -17,13 +17,11 @@ master ← develop ← feature branches
 ### Branch Relationships
 
 ```
-master/develop (ab72f29) - Base
+master/develop (dadf981) - In sync
     │
-    ├── iceberg-spark (5393014) - Iceberg tutorials, SDP docs
-    │       │
-    │       └── feature/integration-testing (4b376e5) - CI/CD, tests [PR #14]
+    │   [MERGED] Phase 0-1: CI/CD, testing, security
     │
-    ├── multimodal (ad65f11) - Pipeline transforms, Lance scripts
+    ├── feature/lance-multimodal (b4eba29) - Lance/LanceDB integration
     │
     ├── feature/unity-catalog-oss (d6303f8) - Unity Catalog integration
     │
@@ -32,43 +30,54 @@ master/develop (ab72f29) - Base
 
 ### Branch Contents
 
-| Branch | Purpose | Key Files |
-|--------|---------|-----------|
-| `feature/integration-testing` | CI/CD, pytest, poetry | `.github/workflows/ci.yml`, `tests/integration/`, `pyproject.toml` |
-| `iceberg-spark` | Iceberg tutorials | `scripts/04-iceberg-spark-quickstart.py`, `docs/guides/` |
-| `multimodal` | Pipeline tests | `tests/test_pipeline_transformations.py` |
-| `feature/unity-catalog-oss` | Unity Catalog | `docker-compose-unity-catalog.yml`, `docs/guides/unity-catalog.md` |
-| `feature/airflow-orchestration` | Airflow DAGs | `dags/`, `docker-compose-airflow.yml` |
+| Branch | Purpose | Status | Key Files |
+|--------|---------|--------|-----------|
+| `master/develop` | Main branches (synced) | Active | All core infrastructure |
+| `feature/lance-multimodal` | Lance vector DB | Ready for PR | `docker-compose-lance.yml`, `scripts/05-10*.py` |
+| `feature/unity-catalog-oss` | Unity Catalog | Ready for PR | `docker-compose-unity-catalog.yml`, `docs/guides/unity-catalog.md` |
+| `feature/airflow-orchestration` | Airflow DAGs | Blocked (needs UC) | `dags/`, `docker-compose-airflow.yml` |
 
-### Uncommitted Work
+### What's in master/develop
 
-Lance/multimodal files exist in working directory but are **not committed**:
-- `config/lance/`, `config/grafana/`, `config/prometheus/`
-- `docker-compose-lance.yml`, `docker-compose-lance-prod.yml`
-- `scripts/05-lance-quickstart.py` through `scripts/10-hybrid-lance-iceberg.py`
-- `tests/test_lance_integration.py`
-
-**Action needed**: Commit these to a `feature/lance-multimodal` branch.
+After Phase 0-1 merge:
+- Comprehensive CI/CD pipeline (`.github/workflows/ci.yml`)
+- Integration test suite (`tests/integration/`)
+- Security infrastructure (`SECURITY.md`, `.pre-commit-config.yaml`, `tests/test_security.py`)
+- Enhanced CLI with preflight checks (`lakehouse`)
+- JAR download with retry logic (`scripts/download-jars.sh`)
+- Multi-version Spark testing (`scripts/test-spark-versions.sh`)
+- Schema migrations (`schemas/`)
 
 ## Integration Plan
 
 ### Phase Status
 
-| Phase | Description | Status | PR |
-|-------|-------------|--------|-----|
-| 0-1 | Foundation hardening, CI/CD, tests | Done | #14 |
-| 2 | Unity Catalog OSS | Pending | - |
-| 3 | Lance + multimodal | Pending | - |
-| 4 | Airflow orchestration | Pending | - |
+| Phase | Description | Status | Notes |
+|-------|-------------|--------|-------|
+| 0-1 | Foundation hardening, CI/CD, tests, security | **DONE** | Merged to master |
+| 2 | Unity Catalog OSS | Ready | Can PR now |
+| 3 | Lance + multimodal | Ready | Can PR now (parallel with Phase 2) |
+| 4 | Airflow orchestration | Blocked | Needs Phase 2 first |
 
 ### Merge Order (Dependencies)
 
 ```
-1. feature/integration-testing → develop (no deps)
-2. feature/unity-catalog-oss → develop (needs Phase 1)
-3. feature/lance-multimodal → develop (needs Phase 1)
-4. feature/airflow-orchestration → develop (needs Phase 2)
+[DONE] 1. Phase 0-1 → develop → master
+[READY] 2. feature/unity-catalog-oss → develop (no blocking deps)
+[READY] 3. feature/lance-multimodal → develop (no blocking deps)
+[BLOCKED] 4. feature/airflow-orchestration → develop (needs Phase 2)
 ```
+
+## Security Requirements
+
+Before merging any PR:
+
+1. **Run pre-commit hooks**: `pre-commit run --all-files`
+2. **Run security tests**: `poetry run pytest -m security -v`
+3. **Check for secrets**: No hardcoded credentials
+4. **Verify CI passes**: All stages green
+
+See `SECURITY.md` for full guidelines.
 
 ## Commands Reference
 
@@ -86,44 +95,56 @@ git diff --stat develop...BRANCH_NAME
 
 # Check uncommitted files
 git status --short
+
+# Check CI status
+gh run list --limit 5
 ```
 
 ### Testing
 
 ```bash
 # Install dependencies
-poetry install
+poetry install --with dev,test
 
-# Run unit tests
-poetry run pytest tests/ --ignore=tests/integration/
+# Run all tests
+poetry run pytest tests/ -v
 
-# Run integration tests (requires Docker)
-poetry run pytest tests/integration/ -v
+# Run by category
+poetry run pytest tests/ --ignore=tests/integration/  # Unit only
+poetry run pytest tests/integration/ -v               # Integration only
+poetry run pytest -m security -v                      # Security only
 
 # Multi-version Spark tests
 ./scripts/test-spark-versions.sh -v 4.1 -t all
 
 # Lint/format
-poetry run ruff check scripts/ tests/
-poetry run black --check scripts/ tests/
+poetry run ruff check scripts/ tests/ --fix
+poetry run black scripts/ tests/
+
+# Security checks
+pre-commit run --all-files
 ```
 
 ### PR Workflow
 
 ```bash
 # Create PR to develop
-gh pr create --base develop --title "feat: description" --body "..."
+gh pr create --base develop --title "feat: description"
 
 # Check PR status
 gh pr list
-
-# View PR checks
 gh pr checks PR_NUMBER
+
+# Merge PR (after approval)
+gh pr merge PR_NUMBER --squash
 ```
 
 ### Service Management
 
 ```bash
+# Setup (first time)
+./lakehouse setup
+
 # Start all services
 ./lakehouse start all
 
@@ -142,38 +163,45 @@ gh pr checks PR_NUMBER
 ### Before Starting Work
 
 1. Check current branch: `git branch --show-current`
-2. Check for uncommitted changes: `git status --short`
-3. Pull latest: `git fetch origin`
+2. Pull latest: `git pull origin develop`
+3. Check for uncommitted changes: `git status --short`
 4. Review this file for current integration status
+5. Read `SECURITY.md` for security guidelines
 
 ### When Creating New Features
 
 1. Branch from `develop`: `git checkout -b feature/NAME develop`
-2. Make changes with tests
-3. Run `poetry run pytest tests/`
-4. Create PR to `develop` (not `master`)
+2. Install pre-commit hooks: `pre-commit install`
+3. Make changes with tests
+4. Run `poetry run pytest tests/`
+5. Run `pre-commit run --all-files`
+6. Create PR to `develop` (not `master`)
 
 ### When Merging Branches
 
 1. Check dependencies in "Merge Order" above
-2. Ensure target branch's dependencies are merged first
-3. Run full test suite after merge
-4. Update this file with new branch state
+2. Ensure CI passes on the PR
+3. Run security tests: `poetry run pytest -m security`
+4. Merge to develop first, then develop → master
+5. Update this file with new branch state
 
 ### Critical Files
 
 | File | Purpose | Caution |
 |------|---------|---------|
-| `lakehouse` | CLI script | Main user interface |
-| `config/spark/spark-defaults.conf` | Spark config | Contains credentials |
+| `lakehouse` | CLI script | Security-sensitive (input validation) |
+| `config/spark/spark-defaults.conf` | Spark config | **Never commit** (credentials) |
+| `.env` | Environment variables | **Never commit** (credentials) |
 | `scripts/download-jars.sh` | JAR downloads | Version-sensitive |
-| `.github/workflows/ci.yml` | CI pipeline | Affects all PRs |
+| `.github/workflows/ci.yml` | CI pipeline | Security-sensitive (pinned actions) |
+| `.pre-commit-config.yaml` | Security hooks | Keep updated |
 
 ### Version Constraints (Do Not Change)
 
 - AWS SDK v2: **2.24.6** (exact match for Hadoop 3.4.1)
 - Iceberg: **1.10.0**
 - Spark: **4.0.1** or **4.1.0** (Scala 2.13)
+- Poetry: **2.1.0**
 
 ## Updating This Document
 

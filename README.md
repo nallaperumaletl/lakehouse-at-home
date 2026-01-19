@@ -159,9 +159,44 @@ terraform init && terraform apply
 
 See [Databricks Deployment Guide](docs/deployment/databricks.md) | Estimated: $100-800/month
 
+## Testing
+
+```bash
+# Install test dependencies
+poetry install --with dev,test
+
+# Run all tests
+poetry run pytest tests/ -v
+
+# Run specific test categories
+poetry run pytest tests/ --ignore=tests/integration/  # Unit tests
+poetry run pytest tests/integration/ -v               # Integration tests
+poetry run pytest -m security -v                      # Security tests
+
+# Multi-version Spark testing
+./scripts/test-spark-versions.sh -v 4.0 -v 4.1 -t all
+```
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for security guidelines.
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run security checks
+pre-commit run --all-files
+poetry run pytest -m security -v
+```
+
 ## Contributing
 
-Contributions welcome! Please open an issue first to discuss changes.
+Contributions welcome! Please:
+1. Open an issue first to discuss changes
+2. Install pre-commit hooks: `pre-commit install`
+3. Run tests before submitting: `poetry run pytest tests/`
+4. See [SECURITY.md](SECURITY.md) for security requirements
 
 ## License
 
