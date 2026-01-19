@@ -67,17 +67,18 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = [
-    "-v",
-    "--tb=short",
-    "-ra",
-]
 markers = [
     "integration: mark test as integration test (may require Docker)",
     "slow: mark test as slow-running",
     "spark40: mark test for Spark 4.0 only",
     "spark41: mark test for Spark 4.1 only",
     "security: mark test as security-focused",
+    "full_stack: marks tests requiring all services running",
+]
+addopts = [
+    "-v",
+    "--tb=short",
+    "-ra",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
