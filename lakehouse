@@ -415,6 +415,11 @@ is_service_healthy() {
     nc -z localhost "$port" 2>/dev/null
 }
 
+# Check Airflow health via API
+is_airflow_healthy() {
+    curl -s --connect-timeout 2 http://localhost:8081/health 2>/dev/null | grep -q '"healthy"'
+}
+
 # Check if container is running (silent, returns 0/1)
 is_container_running() {
     local container=$1
@@ -432,6 +437,8 @@ cmd_status_json() {
     local kafka_ok=$(is_container_running "kafka" && echo "true" || echo "false")
     local zk_ok=$(is_container_running "zookeeper" && echo "true" || echo "false")
     local uc_ok=$(is_container_running "unity-catalog" && echo "true" || echo "false")
+    local airflow_web=$(is_container_running "airflow-webserver" && echo "true" || echo "false")
+    local airflow_sched=$(is_container_running "airflow-scheduler" && echo "true" || echo "false")
 
     cat <<EOF
 {
@@ -453,6 +460,10 @@ cmd_status_json() {
   "kafka": {
     "broker": $kafka_ok,
     "zookeeper": $zk_ok
+  },
+  "airflow": {
+    "webserver": $airflow_web,
+    "scheduler": $airflow_sched
   },
   "all_healthy": $([ "$pg_ok" = "true" ] && [ "$s3_ok" = "true" ] && ([ "$spark41_master" = "true" ] || [ "$spark40_master" = "true" ]) && echo "true" || echo "false")
 }
@@ -482,6 +493,11 @@ cmd_status_human() {
     check_container "kafka"
     check_container "zookeeper"
 
+    echo -e "\n${YELLOW}Airflow Containers:${NC}"
+    check_container "airflow-webserver" && check_service airflow 8081 "Airflow UI" || true
+    check_container "airflow-scheduler"
+    check_container "airflow-triggerer"
+
     echo -e "\n${YELLOW}Ports:${NC}"
     echo "  PostgreSQL:       5432"
     echo "  SeaweedFS:        8333"
@@ -490,12 +506,14 @@ cmd_status_human() {
     echo "  Spark 4.1:        7078, 8082 (UI), 8083 (Worker UI)"
     echo "  Kafka:            9092"
     echo "  Zookeeper:        2181"
+    echo "  Airflow:          8081 (UI)"
 
     echo -e "\n${YELLOW}Configurations:${NC}"
     echo "  Spark 4.0:       docker-compose.yml"
     echo "  Spark 4.1:       docker-compose-spark41.yml"
     echo "  Kafka:           docker-compose-kafka.yml"
     echo "  Unity Catalog:   docker-compose-unity-catalog.yml"
+    echo "  Airflow:         docker-compose-airflow.yml"
     echo "  Spark conf:      config/spark/spark-defaults.conf"
     echo "  Spark conf (UC): config/spark/spark-defaults-uc.conf.example"
 }
@@ -655,10 +673,21 @@ cmd_start() {
     esac
 
     case $service in
-        spark|kafka|all|unity-catalog|uc)
+        airflow)
+            echo -e "${YELLOW}Starting Airflow...${NC}"
+            mkdir -p logs/airflow
+            docker compose -f docker-compose-airflow.yml up -d --build
+            wait_for_service "Airflow" "curl -s http://localhost:8081/health" 120
+            echo -e "${GREEN}Airflow UI available at: http://localhost:8081${NC}"
+            echo -e "${YELLOW}Default credentials: admin/admin (change in .env)${NC}"
+            ;;
+    esac
+
+    case $service in
+        spark|kafka|all|unity-catalog|uc|airflow)
             ;;
         *)
-            echo "Usage: lakehouse start [spark|kafka|unity-catalog|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse start [spark|kafka|airflow|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -699,10 +728,17 @@ cmd_stop() {
     esac
 
     case $service in
-        spark|kafka|all|unity-catalog|uc)
+        airflow)
+            echo -e "${YELLOW}Stopping Airflow...${NC}"
+            docker compose -f docker-compose-airflow.yml down
+            ;;
+    esac
+
+    case $service in
+        spark|kafka|all|unity-catalog|uc|airflow)
             ;;
         *)
-            echo "Usage: lakehouse stop [spark|kafka|unity-catalog|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse stop [spark|kafka|airflow|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -732,8 +768,17 @@ cmd_logs() {
         unity-catalog|uc)
             docker logs -f unity-catalog
             ;;
+        airflow-webserver|airflow-web)
+            docker logs -f airflow-webserver
+            ;;
+        airflow-scheduler|airflow-sched)
+            docker logs -f airflow-scheduler
+            ;;
+        airflow-triggerer)
+            docker logs -f airflow-triggerer
+            ;;
         *)
-            echo "Usage: lakehouse logs [spark-master|spark-worker|kafka|zookeeper|unity-catalog] [--version 4.0|4.1]"
+            echo "Usage: lakehouse logs [spark-master|spark-worker|kafka|zookeeper|unity-catalog|airflow-webserver|airflow-scheduler] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -817,6 +862,26 @@ cmd_test() {
     else
         echo -e "   ${YELLOW}-${NC} Unity Catalog not running (optional)"
         echo -e "   ${YELLOW}→ Run: ./lakehouse start unity-catalog${NC}"
+    fi
+
+    echo -e "\n${YELLOW}6. Testing Airflow (optional)...${NC}"
+    if docker ps --format '{{.Names}}' | grep -q '^airflow-webserver$'; then
+        if curl -s --connect-timeout 5 http://localhost:8081/health | grep -q '"healthy"'; then
+            echo -e "   ${GREEN}✓${NC} Airflow webserver healthy"
+            if docker ps --format '{{.Names}}' | grep -q '^airflow-scheduler$'; then
+                echo -e "   ${GREEN}✓${NC} Airflow scheduler running"
+            else
+                echo -e "   ${RED}✗${NC} Airflow scheduler not running"
+                ((failures++))
+            fi
+        else
+            echo -e "   ${RED}✗${NC} Airflow webserver not responding"
+            echo -e "   ${YELLOW}→ Check: docker logs airflow-webserver${NC}"
+            ((failures++))
+        fi
+    else
+        echo -e "   ${YELLOW}-${NC} Airflow not running (optional)"
+        echo -e "   ${YELLOW}→ Run: ./lakehouse start airflow${NC}"
     fi
 
     # Summary
@@ -1221,10 +1286,10 @@ cmd_help() {
     echo "  preflight           Run preflight checks before starting services"
     echo "  migrate [--dry-run] Run database schema migrations"
     echo "  status              Show all services status"
-    echo "  start [service]     Start service (spark|kafka|unity-catalog|all)"
-    echo "  stop [service]      Stop service (spark|kafka|unity-catalog|all)"
+    echo "  start [service]     Start service (spark|kafka|airflow|unity-catalog|all)"
+    echo "  stop [service]      Stop service (spark|kafka|airflow|unity-catalog|all)"
     echo "  restart [service]   Restart service"
-    echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper|unity-catalog)"
+    echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper|unity-catalog|airflow-*)"
     echo "  test                Run connectivity tests"
     echo "  producer            Start Kafka event producer"
     echo "  consumer            Start Spark streaming consumer"
@@ -1238,12 +1303,20 @@ cmd_help() {
     echo "Services:"
     echo "  spark          Spark cluster (4.0 or 4.1)"
     echo "  kafka          Kafka + Zookeeper"
+    echo "  airflow        Apache Airflow (orchestration)"
     echo "  unity-catalog  Unity Catalog OSS (Iceberg REST Catalog)"
-    echo "  all            Spark + Kafka (not Unity Catalog)"
+    echo "  all            Spark + Kafka (not Unity Catalog or Airflow)"
     echo ""
     echo "Spark Versions:"
     echo "  4.0 - Port 7077, UI 8080 (docker-compose.yml)"
     echo "  4.1 - Port 7078, UI 8082 (docker-compose-spark41.yml)"
+    echo ""
+    echo "Airflow:"
+    echo "  Apache Airflow for workflow orchestration:"
+    echo "  - Web UI on port 8081 (default: admin/admin)"
+    echo "  - Orchestrates Spark jobs, Kafka sensors, Iceberg maintenance"
+    echo "  - DAGs in dags/ directory"
+    echo "  - Config: docker-compose-airflow.yml"
     echo ""
     echo "Unity Catalog:"
     echo "  Unity Catalog OSS provides an alternative to PostgreSQL JDBC catalog:"
@@ -1268,6 +1341,7 @@ cmd_help() {
     echo "  lakehouse status --json"
     echo "  lakehouse start all"
     echo "  lakehouse start spark --version 4.0"
+    echo "  lakehouse start airflow"
     echo "  lakehouse start unity-catalog"
     echo "  lakehouse testdata generate --days 30"
     echo "  lakehouse testdata stream --speed 100"
