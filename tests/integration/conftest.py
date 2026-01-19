@@ -60,7 +60,7 @@ def postgres_container(docker_available) -> Generator:
 
     container = PostgresContainer(
         image="postgres:16",
-        user="iceberg",
+        username="iceberg",
         password="iceberg",
         dbname="iceberg_catalog",
     )
