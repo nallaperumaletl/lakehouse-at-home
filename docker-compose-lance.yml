@@ -1,0 +1,111 @@
+# =============================================================================
+# Docker Compose for Lance-enabled Spark Cluster
+# =============================================================================
+# This configuration adds LanceDB support to the Spark cluster for multimodal
+# AI workloads including vector search, embeddings, and RAG pipelines.
+#
+# Usage:
+#   docker compose -f docker-compose-lance.yml up -d
+#
+# Prerequisites:
+#   - Run scripts/download-lance-jars.sh to download Lance JARs
+#   - Copy config/spark/spark-defaults-lance.conf.example to spark-defaults.conf
+#   - Update credentials in spark-defaults.conf
+#
+# Ports:
+#   - 7079: Spark Master
+#   - 8084: Spark Master Web UI
+#   - 8085: Spark Worker Web UI
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Spark Master with Lance + Iceberg Support
+  # ---------------------------------------------------------------------------
+  spark-master-lance:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-master-lance
+    hostname: spark-master-lance
+    env_file: .env
+    network_mode: "host"
+    environment:
+      - SPARK_MASTER_PORT=7079
+      - SPARK_MASTER_WEBUI_PORT=8084
+      # Lance native library path
+      - LANCE_NATIVE_LIB=/opt/spark/jars-extra
+      # Python packages for Lance
+      - PYSPARK_PYTHON=python3
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+      # Lance data directory (persisted)
+      - lance-data:/opt/lance-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: >
+      bash -c "
+        echo 'Starting Spark Master with Lance support...' &&
+        pip install --quiet lancedb pyarrow numpy pandas &&
+        /opt/spark/sbin/start-master.sh --host 0.0.0.0 --port 7079 --webui-port 8084 &&
+        tail -f /opt/spark/logs/*
+      "
+
+  # ---------------------------------------------------------------------------
+  # Spark Worker with Lance Support
+  # ---------------------------------------------------------------------------
+  spark-worker-lance:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-worker-lance
+    env_file: .env
+    network_mode: "host"
+    environment:
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=16g
+      - SPARK_WORKER_WEBUI_PORT=8085
+      # Lance native library path
+      - LANCE_NATIVE_LIB=/opt/spark/jars-extra
+      - PYSPARK_PYTHON=python3
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+      - lance-data:/opt/lance-data
+    depends_on:
+      spark-master-lance:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    command: >
+      bash -c "
+        echo 'Starting Spark Worker with Lance support...' &&
+        pip install --quiet lancedb pyarrow numpy pandas &&
+        sleep 5 &&
+        /opt/spark/sbin/start-worker.sh spark://localhost:7079 --webui-port 8085 &&
+        tail -f /opt/spark/logs/*
+      "
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  lance-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/lance

@@ -1,0 +1,369 @@
+# =============================================================================
+# Production Docker Compose for Lance-enabled Lakehouse
+# =============================================================================
+# Full production stack with Lance, Iceberg, Kafka, and monitoring.
+#
+# Usage:
+#   docker compose -f docker-compose-lance-prod.yml up -d
+#
+# Prerequisites:
+#   - Copy config/lance/production.env.example to .env.lance and configure
+#   - Run scripts/download-lance-jars.sh
+#   - Ensure sufficient resources (16GB+ RAM recommended)
+#
+# Ports:
+#   - 7079: Spark Master
+#   - 8084: Spark Master Web UI
+#   - 8085-8087: Spark Worker Web UIs
+#   - 9090: Lance Metrics Server
+#   - 9091: Prometheus
+#   - 3000: Grafana
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Spark Master with Lance + Iceberg Support
+  # ---------------------------------------------------------------------------
+  spark-master-lance:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-master-lance
+    hostname: spark-master-lance
+    env_file:
+      - .env
+      - .env.lance
+    network_mode: "host"
+    environment:
+      - SPARK_MASTER_PORT=7079
+      - SPARK_MASTER_WEBUI_PORT=8084
+      - LANCE_NATIVE_LIB=/opt/spark/jars-extra
+      - PYSPARK_PYTHON=python3
+      # Production settings
+      - SPARK_DAEMON_MEMORY=2g
+      - SPARK_NO_DAEMONIZE=true
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./config/lance:/opt/lance-conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+      - lance-data:/opt/lance-data
+      - spark-events:/opt/spark-data/events
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command: >
+      bash -c "
+        echo 'Installing Python dependencies...' &&
+        pip install --quiet lancedb pyarrow numpy pandas sentence-transformers &&
+        echo 'Starting Spark Master with Lance support...' &&
+        /opt/spark/sbin/start-master.sh --host 0.0.0.0 --port 7079 --webui-port 8084 &&
+        tail -f /opt/spark/logs/*
+      "
+
+  # ---------------------------------------------------------------------------
+  # Spark Workers (3 workers for production)
+  # ---------------------------------------------------------------------------
+  spark-worker-lance-1:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-worker-lance-1
+    env_file:
+      - .env
+      - .env.lance
+    network_mode: "host"
+    environment:
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=16g
+      - SPARK_WORKER_WEBUI_PORT=8085
+      - LANCE_NATIVE_LIB=/opt/spark/jars-extra
+      - PYSPARK_PYTHON=python3
+      - SPARK_NO_DAEMONIZE=true
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./config/lance:/opt/lance-conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+      - lance-data:/opt/lance-data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 20G
+        reservations:
+          cpus: '2'
+          memory: 16G
+    depends_on:
+      spark-master-lance:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command: >
+      bash -c "
+        pip install --quiet lancedb pyarrow numpy pandas sentence-transformers &&
+        sleep 10 &&
+        /opt/spark/sbin/start-worker.sh spark://localhost:7079 --webui-port 8085 &&
+        tail -f /opt/spark/logs/*
+      "
+
+  spark-worker-lance-2:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-worker-lance-2
+    env_file:
+      - .env
+      - .env.lance
+    network_mode: "host"
+    environment:
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=16g
+      - SPARK_WORKER_WEBUI_PORT=8086
+      - LANCE_NATIVE_LIB=/opt/spark/jars-extra
+      - PYSPARK_PYTHON=python3
+      - SPARK_NO_DAEMONIZE=true
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./config/lance:/opt/lance-conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+      - lance-data:/opt/lance-data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 20G
+        reservations:
+          cpus: '2'
+          memory: 16G
+    depends_on:
+      spark-master-lance:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command: >
+      bash -c "
+        pip install --quiet lancedb pyarrow numpy pandas sentence-transformers &&
+        sleep 15 &&
+        /opt/spark/sbin/start-worker.sh spark://localhost:7079 --webui-port 8086 &&
+        tail -f /opt/spark/logs/*
+      "
+
+  spark-worker-lance-3:
+    image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+    container_name: spark-worker-lance-3
+    env_file:
+      - .env
+      - .env.lance
+    network_mode: "host"
+    environment:
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=16g
+      - SPARK_WORKER_WEBUI_PORT=8087
+      - LANCE_NATIVE_LIB=/opt/spark/jars-extra
+      - PYSPARK_PYTHON=python3
+      - SPARK_NO_DAEMONIZE=true
+    volumes:
+      - /data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./config/lance:/opt/lance-conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+      - lance-data:/opt/lance-data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 20G
+        reservations:
+          cpus: '2'
+          memory: 16G
+    depends_on:
+      spark-master-lance:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command: >
+      bash -c "
+        pip install --quiet lancedb pyarrow numpy pandas sentence-transformers &&
+        sleep 20 &&
+        /opt/spark/sbin/start-worker.sh spark://localhost:7079 --webui-port 8087 &&
+        tail -f /opt/spark/logs/*
+      "
+
+  # ---------------------------------------------------------------------------
+  # Lance Monitoring Server
+  # ---------------------------------------------------------------------------
+  lance-monitor:
+    image: python:3.11-slim
+    container_name: lance-monitor
+    hostname: lance-monitor
+    env_file:
+      - .env.lance
+    network_mode: "host"
+    environment:
+      - LANCE_PATH=/opt/lance-data
+      - LANCE_METRICS_PORT=9090
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./scripts:/scripts
+      - lance-data:/opt/lance-data:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    command: >
+      bash -c "
+        pip install --quiet lancedb pyarrow numpy &&
+        cd /scripts &&
+        python lance_monitoring.py --port 9090 --lance-path /opt/lance-data
+      "
+
+  # ---------------------------------------------------------------------------
+  # Prometheus for Metrics Collection
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: prometheus
+    hostname: prometheus
+    network_mode: "host"
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - ./config/lance/alerting-rules.yml:/etc/prometheus/rules/lance-alerting-rules.yml:ro
+      - prometheus-data:/prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9091/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.listen-address=:9091'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+
+  # ---------------------------------------------------------------------------
+  # Grafana for Visualization
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: grafana
+    hostname: grafana
+    network_mode: "host"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_HTTP_PORT=3000
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  lance-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/lance
+
+  spark-events:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/spark-events
+
+  prometheus-data:
+    driver: local
+
+  grafana-data:
+    driver: local
