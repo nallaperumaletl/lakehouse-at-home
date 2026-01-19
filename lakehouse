@@ -431,12 +431,14 @@ cmd_status_json() {
     local spark41_worker=$(is_container_running "spark-worker-41" && echo "true" || echo "false")
     local kafka_ok=$(is_container_running "kafka" && echo "true" || echo "false")
     local zk_ok=$(is_container_running "zookeeper" && echo "true" || echo "false")
+    local uc_ok=$(is_container_running "unity-catalog" && echo "true" || echo "false")
 
     cat <<EOF
 {
   "services": {
     "postgresql": $pg_ok,
-    "seaweedfs": $s3_ok
+    "seaweedfs": $s3_ok,
+    "unity_catalog": $uc_ok
   },
   "spark": {
     "4.0": {
@@ -465,6 +467,9 @@ cmd_status_human() {
     check_service postgres 5432 "PostgreSQL"
     check_service seaweedfs 8333 "SeaweedFS"
 
+    echo -e "\n${YELLOW}Unity Catalog (optional):${NC}"
+    check_container "unity-catalog" && check_service uc 8080 "Unity Catalog REST API" || true
+
     echo -e "\n${YELLOW}Spark 4.0 Containers:${NC}"
     check_container "spark-master" && docker exec spark-master /opt/spark/bin/spark-submit --version 2>&1 | grep "version" | head -1 || true
     check_container "spark-worker"
@@ -480,16 +485,19 @@ cmd_status_human() {
     echo -e "\n${YELLOW}Ports:${NC}"
     echo "  PostgreSQL:       5432"
     echo "  SeaweedFS:        8333"
+    echo "  Unity Catalog:    8080 (REST API + Iceberg endpoint)"
     echo "  Spark 4.0:        7077, 8080 (UI), 8081 (Worker UI)"
     echo "  Spark 4.1:        7078, 8082 (UI), 8083 (Worker UI)"
     echo "  Kafka:            9092"
     echo "  Zookeeper:        2181"
 
     echo -e "\n${YELLOW}Configurations:${NC}"
-    echo "  Spark 4.0:   docker-compose.yml"
-    echo "  Spark 4.1:   docker-compose-spark41.yml"
-    echo "  Kafka:       docker-compose-kafka.yml"
-    echo "  Spark conf:  config/spark/spark-defaults.conf"
+    echo "  Spark 4.0:       docker-compose.yml"
+    echo "  Spark 4.1:       docker-compose-spark41.yml"
+    echo "  Kafka:           docker-compose-kafka.yml"
+    echo "  Unity Catalog:   docker-compose-unity-catalog.yml"
+    echo "  Spark conf:      config/spark/spark-defaults.conf"
+    echo "  Spark conf (UC): config/spark/spark-defaults-uc.conf.example"
 }
 
 # Status command dispatcher
@@ -524,10 +532,23 @@ cmd_start() {
     esac
 
     case $service in
-        spark|kafka|all)
+        unity-catalog|uc)
+            echo -e "${YELLOW}Starting Unity Catalog...${NC}"
+            if [ ! -f "config/unity-catalog/server.properties" ]; then
+                echo -e "${YELLOW}Creating server.properties from example...${NC}"
+                cp config/unity-catalog/server.properties.example config/unity-catalog/server.properties
+                echo -e "${YELLOW}!${NC} Edit config/unity-catalog/server.properties with your S3 credentials"
+            fi
+            docker compose -f docker-compose-unity-catalog.yml up -d
+            wait_for_service "Unity Catalog" "curl -s http://localhost:8080/api/2.1/unity-catalog/catalogs" 60
+            ;;
+    esac
+
+    case $service in
+        spark|kafka|all|unity-catalog|uc)
             ;;
         *)
-            echo "Usage: lakehouse start [spark|kafka|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse start [spark|kafka|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -561,10 +582,17 @@ cmd_stop() {
     esac
 
     case $service in
-        spark|kafka|all)
+        unity-catalog|uc)
+            echo -e "${YELLOW}Stopping Unity Catalog...${NC}"
+            docker compose -f docker-compose-unity-catalog.yml down
+            ;;
+    esac
+
+    case $service in
+        spark|kafka|all|unity-catalog|uc)
             ;;
         *)
-            echo "Usage: lakehouse stop [spark|kafka|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse stop [spark|kafka|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -591,8 +619,11 @@ cmd_logs() {
         zookeeper)
             docker logs -f zookeeper
             ;;
+        unity-catalog|uc)
+            docker logs -f unity-catalog
+            ;;
         *)
-            echo "Usage: lakehouse logs [spark-master|spark-worker|kafka|zookeeper] [--version 4.0|4.1]"
+            echo "Usage: lakehouse logs [spark-master|spark-worker|kafka|zookeeper|unity-catalog] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -656,6 +687,26 @@ cmd_test() {
         echo -e "   ${RED}✗${NC} Spark container not running ($master_container)"
         echo -e "   ${YELLOW}→ Run: ./lakehouse start spark${NC}"
         ((failures++))
+    fi
+
+    echo -e "\n${YELLOW}5. Testing Unity Catalog (optional)...${NC}"
+    if docker ps --format '{{.Names}}' | grep -q '^unity-catalog$'; then
+        if curl -s --connect-timeout 5 http://localhost:8080/api/2.1/unity-catalog/catalogs > /dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} Unity Catalog REST API healthy"
+            # Test Iceberg REST endpoint
+            if curl -s --connect-timeout 5 http://localhost:8080/api/2.1/unity-catalog/iceberg/v1/config > /dev/null 2>&1; then
+                echo -e "   ${GREEN}✓${NC} Iceberg REST Catalog endpoint available"
+            else
+                echo -e "   ${YELLOW}!${NC} Iceberg REST endpoint not responding (may need configuration)"
+            fi
+        else
+            echo -e "   ${RED}✗${NC} Unity Catalog not responding"
+            echo -e "   ${YELLOW}→ Check: docker logs unity-catalog${NC}"
+            ((failures++))
+        fi
+    else
+        echo -e "   ${YELLOW}-${NC} Unity Catalog not running (optional)"
+        echo -e "   ${YELLOW}→ Run: ./lakehouse start unity-catalog${NC}"
     fi
 
     # Summary
@@ -1060,10 +1111,10 @@ cmd_help() {
     echo "  preflight           Run preflight checks before starting services"
     echo "  migrate [--dry-run] Run database schema migrations"
     echo "  status              Show all services status"
-    echo "  start [service]     Start service (spark|kafka|all)"
-    echo "  stop [service]      Stop service (spark|kafka|all)"
+    echo "  start [service]     Start service (spark|kafka|unity-catalog|all)"
+    echo "  stop [service]      Stop service (spark|kafka|unity-catalog|all)"
     echo "  restart [service]   Restart service"
-    echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper)"
+    echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper|unity-catalog)"
     echo "  test                Run connectivity tests"
     echo "  producer            Start Kafka event producer"
     echo "  consumer            Start Spark streaming consumer"
@@ -1074,9 +1125,22 @@ cmd_help() {
     echo "  --version 4.0|4.1   Select Spark version (default: 4.1)"
     echo "  --json              Output status in JSON format (for status command)"
     echo ""
+    echo "Services:"
+    echo "  spark          Spark cluster (4.0 or 4.1)"
+    echo "  kafka          Kafka + Zookeeper"
+    echo "  unity-catalog  Unity Catalog OSS (Iceberg REST Catalog)"
+    echo "  all            Spark + Kafka (not Unity Catalog)"
+    echo ""
     echo "Spark Versions:"
     echo "  4.0 - Port 7077, UI 8080 (docker-compose.yml)"
     echo "  4.1 - Port 7078, UI 8082 (docker-compose-spark41.yml)"
+    echo ""
+    echo "Unity Catalog:"
+    echo "  Unity Catalog OSS provides an alternative to PostgreSQL JDBC catalog:"
+    echo "  - REST API for Iceberg tables (port 8080)"
+    echo "  - Multi-format support (Delta, Iceberg, Hudi via UniForm)"
+    echo "  - Interoperability with DuckDB, Trino, Dremio"
+    echo "  See: docs/guides/unity-catalog.md"
     echo ""
     echo "Test Data Commands:"
     echo "  testdata generate   Generate 90-day dataset (~75K orders)"
@@ -1094,6 +1158,7 @@ cmd_help() {
     echo "  lakehouse status --json"
     echo "  lakehouse start all"
     echo "  lakehouse start spark --version 4.0"
+    echo "  lakehouse start unity-catalog"
     echo "  lakehouse testdata generate --days 30"
     echo "  lakehouse testdata stream --speed 100"
 }
