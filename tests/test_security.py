@@ -214,18 +214,21 @@ class TestCISecurityConfig:
 
         content = ci_path.read_text()
 
+        # Match patterns like: curl URL | sh, curl URL | bash, etc.
+        # The \| escapes the literal pipe character
         dangerous_patterns = [
-            "curl.*|.*sh",
-            "curl.*|.*bash",
-            "curl.*|.*python",
-            "wget.*|.*sh",
+            r"curl\s+[^\|]+\|\s*sh\b",
+            r"curl\s+[^\|]+\|\s*bash\b",
+            r"curl\s+[^\|]+\|\s*python",
+            r"wget\s+[^\|]+\|\s*sh\b",
+            r"wget\s+[^\|]+\|\s*bash\b",
         ]
 
         for pattern in dangerous_patterns:
             matches = re.findall(pattern, content, re.IGNORECASE)
             assert (
                 not matches
-            ), f"Dangerous curl-pipe pattern found: {matches}"
+            ), f"Dangerous curl-pipe-to-shell pattern found: {matches}"
 
 
 class TestPreCommitConfig:

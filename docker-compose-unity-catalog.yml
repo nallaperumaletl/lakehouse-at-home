@@ -1,0 +1,60 @@
+# Unity Catalog OSS - Standalone deployment
+#
+# This provides an alternative to the PostgreSQL JDBC catalog with:
+# - REST API for Iceberg tables
+# - Multi-format support (Delta, Iceberg, Hudi via UniForm)
+# - Credential vending for S3/SeaweedFS
+# - Interoperability with DuckDB, Trino, Dremio, etc.
+#
+# Usage:
+#   docker compose -f docker-compose-unity-catalog.yml up -d
+#
+# Then configure Spark to use Unity Catalog REST endpoint:
+#   spark.sql.catalog.iceberg.uri = http://localhost:8080/api/2.1/unity-catalog/iceberg
+
+services:
+  unity-catalog:
+    image: unitycatalog/unitycatalog:0.3.1
+    container_name: unity-catalog
+    ports:
+      - "8080:8080"      # REST API + Iceberg REST Catalog endpoint
+    environment:
+      - JAVA_OPTS=-Xmx2g
+    volumes:
+      - ./config/unity-catalog:/opt/unitycatalog/etc/conf
+      - uc-data:/opt/unitycatalog/etc/db
+      - uc-logs:/opt/unitycatalog/etc/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/2.1/unity-catalog/catalogs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - lakehouse-network
+
+  # Optional: Unity Catalog Web UI
+  # Uncomment to enable the graphical interface
+  # unity-catalog-ui:
+  #   image: unitycatalog/unitycatalog-ui:0.3.1
+  #   container_name: unity-catalog-ui
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - UC_API_URL=http://unity-catalog:8080
+  #   depends_on:
+  #     unity-catalog:
+  #       condition: service_healthy
+  #   networks:
+  #     - lakehouse-network
+
+volumes:
+  uc-data:
+    driver: local
+  uc-logs:
+    driver: local
+
+networks:
+  lakehouse-network:
+    driver: bridge

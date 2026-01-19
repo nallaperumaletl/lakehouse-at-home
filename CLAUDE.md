@@ -10,6 +10,7 @@ Self-hostable data lakehouse: Spark 4.x + Iceberg 1.10 + Kafka 3.6 + PostgreSQL 
 |----------|---------|
 | `docs/getting-started/` | Installation, quickstart, configuration |
 | `docs/guides/` | CLI reference, streaming, test data, multi-version Spark |
+| `docs/guides/unity-catalog.md` | Unity Catalog OSS setup and migration |
 | `docs/deployment/` | Local and AWS deployment |
 | `docs/architecture.md` | System design |
 | `docs/troubleshooting.md` | Common issues |
@@ -31,6 +32,11 @@ Self-hostable data lakehouse: Spark 4.x + Iceberg 1.10 + Kafka 3.6 + PostgreSQL 
 ./lakehouse status --json  # Machine-readable status
 ./lakehouse test           # Connectivity tests (returns exit code)
 ./lakehouse logs <service> # View logs (spark-master, kafka, etc.)
+
+# Unity Catalog (optional)
+./lakehouse start unity-catalog  # Start Unity Catalog REST server
+./lakehouse stop unity-catalog   # Stop Unity Catalog
+./lakehouse logs unity-catalog   # View Unity Catalog logs
 
 # Database migrations
 ./lakehouse migrate        # Apply schema migrations
@@ -73,9 +79,11 @@ poetry run pytest -m spark41 -v                           # Spark 4.1 only
 | `lakehouse` | CLI script (bash) |
 | `.env` | Credentials (from .env.example) - **NOT in git** |
 | `config/spark/spark-defaults.conf` | Spark config - **NOT in git** |
+| `config/spark/spark-defaults-uc.conf` | Spark config for Unity Catalog - **NOT in git** |
 | `docker-compose-spark41.yml` | Spark 4.1 cluster (default) |
 | `docker-compose.yml` | Spark 4.0 cluster |
 | `docker-compose-kafka.yml` | Kafka + Zookeeper |
+| `docker-compose-unity-catalog.yml` | Unity Catalog OSS server |
 | `jars/` | Required JARs (~860MB) |
 | `scripts/` | PySpark examples |
 | `tests/` | Test suite |
@@ -86,9 +94,13 @@ poetry run pytest -m spark41 -v                           # Spark 4.1 only
 
 ```
 Spark 4.x → Iceberg 1.10 → PostgreSQL (metadata) + SeaweedFS (data)
-                ↑
-            Kafka 3.6 (streaming)
+                ↑               ↑
+            Kafka 3.6      Unity Catalog (optional REST catalog)
 ```
+
+**Catalog Options:**
+- **PostgreSQL JDBC** (default) - Direct SQL, Spark-only
+- **Unity Catalog OSS** (optional) - REST API, multi-client (DuckDB, Trino, etc.)
 
 **Namespaces (Medallion):**
 - `iceberg.bronze.*` - Raw data
@@ -105,6 +117,7 @@ Spark 4.x → Iceberg 1.10 → PostgreSQL (metadata) + SeaweedFS (data)
 | Spark 4.1 | 7078 (UI: 8082) |
 | Kafka | 9092 |
 | Zookeeper | 2181 |
+| Unity Catalog | 8081 (when running with Spark) |
 
 ## Code Style
 
