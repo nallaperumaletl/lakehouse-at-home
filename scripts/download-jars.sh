@@ -2,7 +2,10 @@
 
 set -e  # Exit on error
 
-JARS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../jars" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JARS_DIR="${SCRIPT_DIR}/../jars"
+mkdir -p "${JARS_DIR}"
+JARS_DIR="$(cd "${JARS_DIR}" && pwd)"
 VERIFY_ONLY=false
 MAX_RETRIES=3
 RETRY_DELAY=5
