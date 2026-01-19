@@ -1222,4 +1222,4 @@ test = ["psycopg2-binary", "pytest", "pytest-timeout", "testcontainers"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "155ce5b6deafe16314d55b5d76a38e3d75d4e3bc7660671a6883c5496f8018d8"
+content-hash = "415adf2e1dfb61c671e45fc07caac022222ed3ff6672f2ae5cdf29a5cb0539b7"
