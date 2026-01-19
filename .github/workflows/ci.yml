@@ -363,11 +363,14 @@ jobs:
           docker compose -f ${{ matrix.compose-file }} down || true
 
   # Stage 6: End-to-end pipeline test
+  # Runs on: pushes to master AND PRs targeting master
   e2e-pipeline:
     name: E2E Pipeline Test
     runs-on: ubuntu-latest
     needs: spark-matrix
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'master')
     services:
       postgres:
         image: postgres:16
