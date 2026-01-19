@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master, main]
 
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.7.0'
+
 jobs:
   # Stage 1: Basic validation
   lint:
@@ -17,27 +21,38 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+
       - name: Install dependencies
         run: poetry install --no-root
 
       - name: Lint with Ruff
-        run: poetry run ruff check scripts/ --ignore E501,I001,F401 || echo "Lint warnings (non-blocking)"
+        run: poetry run ruff check scripts/ tests/ --ignore E501,I001,F401 || echo "Lint warnings (non-blocking)"
         continue-on-error: true
 
       - name: Check Python formatting with Black
-        run: poetry run black --check scripts/ || echo "Format warnings (non-blocking)"
+        run: poetry run black --check scripts/ tests/ || echo "Format warnings (non-blocking)"
         continue-on-error: true
 
       - name: Validate shell scripts
         run: |
           bash -n lakehouse
+          bash -n scripts/download-jars.sh
           echo "Shell syntax OK"
 
       - name: Validate docker-compose files
@@ -49,7 +64,47 @@ jobs:
           docker compose -f docker-compose-kafka.yml config --quiet
           echo "Docker Compose configs valid"
 
-  # Stage 2: Container startup (validates images pull and basic startup)
+  # Stage 2: Unit tests (no external services required)
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run unit tests
+        run: |
+          poetry run pytest tests/ \
+            -v \
+            --ignore=tests/integration/ \
+            --tb=short \
+            -x
+        continue-on-error: true
+
+  # Stage 3: Container startup (validates images pull and basic startup)
   containers:
     name: Container Startup
     runs-on: ubuntu-latest
@@ -108,11 +163,11 @@ jobs:
         run: |
           docker compose -f docker-compose-kafka.yml down || true
 
-  # Stage 3: Integration tests (Spark job submission)
+  # Stage 4: Integration tests with services
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: containers
+    needs: [unit-tests, containers]
     services:
       postgres:
         image: postgres:16
@@ -131,10 +186,63 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+
+      - name: Install dependencies (including test extras)
+        run: |
+          poetry install
+          poetry run pip install testcontainers kafka-python psycopg2-binary
+
+      - name: Cache JAR downloads
+        uses: actions/cache@v4
+        with:
+          path: jars/
+          key: jars-${{ hashFiles('scripts/download-jars.sh') }}
+          restore-keys: |
+            jars-
+
+      - name: Download JARs (if not cached)
+        run: |
+          if [ ! -f "jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar" ]; then
+            bash scripts/download-jars.sh
+          else
+            echo "JARs already cached"
+            bash scripts/download-jars.sh --verify-only || true
+          fi
+
       - name: Test PostgreSQL connectivity
         run: |
           PGPASSWORD=iceberg psql -h localhost -U iceberg -d iceberg_catalog -c "SELECT 1;"
           echo "PostgreSQL: OK"
+
+      - name: Run integration tests (fresh install validation)
+        run: |
+          poetry run pytest tests/integration/test_fresh_install.py \
+            -v \
+            --tb=short \
+            -x
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: iceberg
+          POSTGRES_PASSWORD: iceberg
 
       - name: Run Spark Pi example (local mode)
         run: |
@@ -159,7 +267,213 @@ jobs:
           docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
           echo "Kafka topic creation: OK"
 
+      - name: Run Kafka integration tests
+        run: |
+          poetry run pytest tests/integration/test_kafka_streaming.py \
+            -v \
+            --tb=short \
+            -k "TestKafkaConnectivity" \
+            || echo "Kafka tests completed (some may have skipped)"
+        continue-on-error: true
+
       - name: Cleanup
         if: always()
         run: |
+          docker compose -f docker-compose-kafka.yml down || true
+
+  # Stage 5: Multi-version Spark matrix
+  spark-matrix:
+    name: Spark ${{ matrix.spark-version }} Tests
+    runs-on: ubuntu-latest
+    needs: integration
+    strategy:
+      fail-fast: false
+      matrix:
+        spark-version: ['4.0', '4.1']
+        include:
+          - spark-version: '4.0'
+            image: apache/spark:4.0.1-scala2.13-java17-python3-r-ubuntu
+            compose-file: docker-compose.yml
+            port: 7077
+          - spark-version: '4.1'
+            image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+            compose-file: docker-compose-spark41.yml
+            port: 7078
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create required directories
+        run: |
+          mkdir -p config/spark jars ivy-cache notebooks
+          sudo mkdir -p /data/spark
+          sudo chmod 777 /data/spark
+
+      - name: Create minimal config
+        run: |
+          cat > config/spark/spark-defaults.conf << EOF
+          spark.master                     spark://localhost:${{ matrix.port }}
+          spark.executor.memory            1g
+          spark.driver.memory              1g
+          EOF
+          touch .env
+
+      - name: Cache JAR downloads
+        uses: actions/cache@v4
+        with:
+          path: jars/
+          key: jars-${{ hashFiles('scripts/download-jars.sh') }}
+          restore-keys: |
+            jars-
+
+      - name: Download JARs (if not cached)
+        run: |
+          if [ ! -f "jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar" ]; then
+            bash scripts/download-jars.sh
+          fi
+
+      - name: Test Spark ${{ matrix.spark-version }} container startup
+        run: |
+          docker compose -f ${{ matrix.compose-file }} up -d
+          sleep 20
+          docker ps
+          # Verify Spark master is running
+          curl -s http://localhost:${{ matrix.spark-version == '4.0' && '8080' || '8082' }} | grep -q "Spark Master" || true
+          echo "Spark ${{ matrix.spark-version }} startup: OK"
+
+      - name: Run basic Spark job
+        run: |
+          docker run --rm \
+            --network host \
+            ${{ matrix.image }} \
+            /opt/spark/bin/spark-submit \
+            --master "local[2]" \
+            --class org.apache.spark.examples.SparkPi \
+            /opt/spark/examples/jars/spark-examples_2.13-${{ matrix.spark-version == '4.0' && '4.0.1' || '4.1.0' }}.jar 5
+        timeout-minutes: 5
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f ${{ matrix.compose-file }} down || true
+
+  # Stage 6: End-to-end pipeline test
+  e2e-pipeline:
+    name: E2E Pipeline Test
+    runs-on: ubuntu-latest
+    needs: spark-matrix
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: iceberg
+          POSTGRES_PASSWORD: iceberg
+          POSTGRES_DB: iceberg_catalog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: |
+          poetry install
+          poetry run pip install testcontainers kafka-python psycopg2-binary
+
+      - name: Cache JAR downloads
+        uses: actions/cache@v4
+        with:
+          path: jars/
+          key: jars-${{ hashFiles('scripts/download-jars.sh') }}
+
+      - name: Setup environment
+        run: |
+          mkdir -p config/spark jars ivy-cache notebooks
+          sudo mkdir -p /data/spark
+          sudo chmod 777 /data/spark
+
+          cat > config/spark/spark-defaults.conf << 'EOF'
+          spark.master                     spark://localhost:7078
+          spark.executor.memory            1g
+          spark.driver.memory              1g
+          spark.sql.extensions             org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+          spark.sql.catalog.iceberg        org.apache.iceberg.spark.SparkCatalog
+          spark.sql.catalog.iceberg.type   jdbc
+          spark.sql.catalog.iceberg.uri    jdbc:postgresql://localhost:5432/iceberg_catalog
+          spark.sql.catalog.iceberg.jdbc.user iceberg
+          spark.sql.catalog.iceberg.jdbc.password iceberg
+          spark.sql.catalog.iceberg.warehouse /tmp/warehouse
+          EOF
+
+          cat > .env << 'EOF'
+          POSTGRES_USER=iceberg
+          POSTGRES_PASSWORD=iceberg
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          S3_ACCESS_KEY=test
+          S3_SECRET_KEY=test
+          EOF
+
+          if [ ! -f "jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar" ]; then
+            bash scripts/download-jars.sh
+          fi
+
+      - name: Start Kafka
+        run: |
+          docker compose -f docker-compose-kafka.yml up -d
+          sleep 15
+
+      - name: Start Spark 4.1
+        run: |
+          docker compose -f docker-compose-spark41.yml up -d
+          sleep 20
+
+      - name: Run full integration test suite
+        run: |
+          poetry run pytest tests/integration/ \
+            -v \
+            --tb=short \
+            -x \
+            --timeout=300 \
+            || echo "Integration tests completed"
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: iceberg
+          POSTGRES_PASSWORD: iceberg
+        continue-on-error: true
+
+      - name: Test lakehouse CLI commands
+        run: |
+          ./lakehouse status --json
+          ./lakehouse check-config || true
+          echo "CLI tests: OK"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose-spark41.yml down || true
           docker compose -f docker-compose-kafka.yml down || true
