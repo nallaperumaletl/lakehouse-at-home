@@ -14,7 +14,7 @@
 
 services:
   unity-catalog:
-    image: unitycatalog/unitycatalog:0.2.1
+    image: unitycatalog/unitycatalog:0.3.1
     container_name: unity-catalog
     ports:
       - "8080:8080"      # REST API + Iceberg REST Catalog endpoint
@@ -37,7 +37,7 @@ services:
   # Optional: Unity Catalog Web UI
   # Uncomment to enable the graphical interface
   # unity-catalog-ui:
-  #   image: unitycatalog/unitycatalog-ui:0.2.1
+  #   image: unitycatalog/unitycatalog-ui:0.3.1
   #   container_name: unity-catalog-ui
   #   ports:
   #     - "3000:3000"
