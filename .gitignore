@@ -1,6 +1,7 @@
 # Credentials and Secrets
 config/spark/spark-defaults.conf
 config/spark/spark-defaults-uc.conf
+config/unity-catalog/server.properties
 .env
 .env.*
 !.env.example

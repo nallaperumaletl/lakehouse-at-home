@@ -24,6 +24,7 @@ A fully open-source, self-hostable data lakehouse for local development and test
 | Apache Kafka | 3.6 | Event streaming |
 | PostgreSQL | 16 | Catalog metadata |
 | SeaweedFS | - | S3-compatible storage |
+| Unity Catalog | 0.3.1 | REST catalog (optional) |
 
 ## Requirements
 
@@ -73,13 +74,22 @@ See [Installation Guide](docs/getting-started/installation.md) for detailed OS-s
 ## CLI
 
 ```bash
-./lakehouse setup                # Validate and install dependencies
+# Setup & validation
+./lakehouse setup                # Validate prereqs, download JARs, install deps
+./lakehouse check-config         # Validate credential consistency
+./lakehouse preflight            # Test service connectivity
+
+# Service management
 ./lakehouse start all            # Start Spark + Kafka
 ./lakehouse stop all             # Stop all services
 ./lakehouse status               # Check service health
 ./lakehouse status --json        # Machine-readable status
 ./lakehouse test                 # Run connectivity tests
 ./lakehouse logs spark-master    # View logs
+
+# Unity Catalog (optional)
+./lakehouse start unity-catalog  # Start Unity Catalog REST server
+./lakehouse stop unity-catalog   # Stop Unity Catalog
 ```
 
 See [CLI Reference](docs/guides/cli-reference.md) for all commands.
@@ -106,23 +116,34 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | [CLI Reference](docs/guides/cli-reference.md) | All commands |
 | [Streaming](docs/guides/streaming.md) | Kafka + Spark streaming |
 | [Multi-Version Spark](docs/guides/multi-version.md) | Run 4.0 and 4.1 together |
+| [Unity Catalog](docs/guides/unity-catalog.md) | REST catalog setup & migration |
 | [Architecture](docs/architecture.md) | System design |
 | [AWS Deployment](docs/deployment/aws.md) | Cloud production setup |
 | [Databricks Deployment](docs/deployment/databricks.md) | Managed Spark platform |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
+| [Security](SECURITY.md) | Security guidelines for contributors |
 
 ## Architecture
 
 ```
-Spark 4.x ─────▶ Iceberg 1.10 ─────▶ PostgreSQL (metadata)
-                      │
-                      ▼
-                 SeaweedFS (S3)
+                              ┌─────────────────────┐
+                              │  PostgreSQL (JDBC)  │
+                              │    OR               │
+Spark 4.x ────▶ Iceberg 1.10 ─┤  Unity Catalog      │
+                              │    (REST API)       │
+                              └─────────────────────┘
+                    │
+                    ▼
+               SeaweedFS (S3)
 
 Kafka 3.6 ◀──── Streaming ────▶ Iceberg Tables
 ```
 
-Tables follow medallion architecture:
+**Catalog Options:**
+- **PostgreSQL JDBC** (default): Direct SQL, Spark-only
+- **Unity Catalog OSS** (optional): REST API, works with DuckDB, Trino, Dremio
+
+**Medallion Architecture:**
 - `iceberg.bronze.*` - Raw data
 - `iceberg.silver.*` - Cleaned/transformed
 - `iceberg.gold.*` - Business-ready
@@ -136,6 +157,7 @@ Tables follow medallion architecture:
 | Spark 4.0 | 7077 | http://localhost:8080 |
 | Spark 4.1 | 7078 | http://localhost:8082 |
 | Kafka | 9092 | - |
+| Unity Catalog | 8080 | REST API |
 
 ## Cloud Deployment
 

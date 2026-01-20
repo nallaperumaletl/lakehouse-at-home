@@ -23,7 +23,8 @@ master/develop (dadf981) - In sync
     │
     ├── feature/lance-multimodal (b4eba29) - Lance/LanceDB integration
     │
-    ├── feature/unity-catalog-oss (d6303f8) - Unity Catalog integration
+    ├── feature/unity-catalog-oss (385eeac) - Unity Catalog [PR #11]
+    │       └── Rebased on develop, integration tests added
     │
     └── feature/airflow-orchestration (0639417) - Airflow + Unity Catalog
 ```
@@ -34,7 +35,7 @@ master/develop (dadf981) - In sync
 |--------|---------|--------|-----------|
 | `master/develop` | Main branches (synced) | Active | All core infrastructure |
 | `feature/lance-multimodal` | Lance vector DB | Ready for PR | `docker-compose-lance.yml`, `scripts/05-10*.py` |
-| `feature/unity-catalog-oss` | Unity Catalog | Ready for PR | `docker-compose-unity-catalog.yml`, `docs/guides/unity-catalog.md` |
+| `feature/unity-catalog-oss` | Unity Catalog | **PR #11 Open** | `docker-compose-unity-catalog.yml`, `docs/guides/unity-catalog.md`, `tests/integration/test_unity_catalog.py` |
 | `feature/airflow-orchestration` | Airflow DAGs | Blocked (needs UC) | `dags/`, `docker-compose-airflow.yml` |
 
 ### What's in master/develop
@@ -48,6 +49,14 @@ After Phase 0-1 merge:
 - Multi-version Spark testing (`scripts/test-spark-versions.sh`)
 - Schema migrations (`schemas/`)
 
+### Pending in feature/unity-catalog-oss (PR #11)
+
+- Unity Catalog OSS deployment (`docker-compose-unity-catalog.yml`)
+- Spark REST catalog configuration (`config/spark/spark-defaults-uc.conf.example`)
+- Unity Catalog guide (`docs/guides/unity-catalog.md`)
+- Demo script (`scripts/unity_catalog_demo.py`)
+- Integration tests (`tests/integration/test_unity_catalog.py` - 17 tests)
+
 ## Integration Plan
 
 ### Phase Status
@@ -55,7 +64,7 @@ After Phase 0-1 merge:
 | Phase | Description | Status | Notes |
 |-------|-------------|--------|-------|
 | 0-1 | Foundation hardening, CI/CD, tests, security | **DONE** | Merged to master |
-| 2 | Unity Catalog OSS | Ready | Can PR now |
+| 2 | Unity Catalog OSS | **PR OPEN** | PR #11, rebased with tests |
 | 3 | Lance + multimodal | Ready | Can PR now (parallel with Phase 2) |
 | 4 | Airflow orchestration | Blocked | Needs Phase 2 first |
 
@@ -63,7 +72,7 @@ After Phase 0-1 merge:
 
 ```
 [DONE] 1. Phase 0-1 → develop → master
-[READY] 2. feature/unity-catalog-oss → develop (no blocking deps)
+[PR #11] 2. feature/unity-catalog-oss → develop (17 tests, rebased)
 [READY] 3. feature/lance-multimodal → develop (no blocking deps)
 [BLOCKED] 4. feature/airflow-orchestration → develop (needs Phase 2)
 ```
