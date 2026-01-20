@@ -28,6 +28,10 @@ wget -q --show-progress https://repo1.maven.org/maven2/software/amazon/awssdk/bu
 echo "⬇️  PostgreSQL JDBC 42.7.4..."
 wget -q --show-progress https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar
 
+# Lance Spark Bundle (for multimodal/vector workloads)
+echo "⬇️  Lance Spark Bundle 4.0_2.13-0.0.15..."
+wget -q --show-progress https://github.com/lancedb/lance/releases/download/v0.0.15/lance-spark-bundle-4.0_2.13-0.0.15.jar
+
 echo ""
 echo "✅ All JARs downloaded successfully!"
 echo ""
