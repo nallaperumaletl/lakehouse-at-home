@@ -5,17 +5,24 @@ Run real-time streaming pipelines with Kafka and Spark Structured Streaming.
 ## Architecture
 
 ```
-┌──────────────┐      ┌─────────────┐      ┌──────────────┐
-│   Producer   │ ──── │    Kafka    │ ──── │    Spark     │
-│  (Python)    │      │   Broker    │      │  Streaming   │
-└──────────────┘      └─────────────┘      └──────────────┘
-                             │
-                             ▼
-                      ┌─────────────┐
-                      │   Iceberg   │
-                      │   Tables    │
-                      └─────────────┘
+┌──────────────┐      ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│   Producer   │ ──── │    Kafka    │ ──── │    Spark     │ ──── │   Iceberg   │
+│  (Python)    │      │   Broker    │      │  Streaming   │      │   Tables    │
+└──────────────┘      └─────────────┘      └──────────────┘      └─────────────┘
+                      (event queue)        (direct read)         (via catalog)
+                                                  │
+                                                  ▼
+                                           ┌─────────────┐
+                                           │ Checkpoints │
+                                           │(exactly-once)│
+                                           └─────────────┘
 ```
+
+**Key points:**
+- Kafka serves as an event queue (not managed by Iceberg catalog)
+- Spark reads directly from Kafka topics
+- Spark writes to Iceberg tables via the catalog
+- Checkpoints enable exactly-once processing
 
 ## Quick Start
 

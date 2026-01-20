@@ -57,6 +57,9 @@ Required:
 | Spark 4.1 Master | 7078 | http://localhost:8082 |
 | Kafka | 9092 | - |
 | Zookeeper | 2181 | - |
+| Unity Catalog (optional) | 8080 | REST API |
+
+**Note**: Unity Catalog and Spark 4.0 UI both use port 8080. Run one at a time, or reconfigure.
 
 ## Running Spark Jobs
 

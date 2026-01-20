@@ -126,27 +126,61 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 ## Architecture
 
 ```
-                              ┌─────────────────────┐
-                              │  PostgreSQL (JDBC)  │
-                              │    OR               │
-Spark 4.x ────▶ Iceberg 1.10 ─┤  Unity Catalog      │
-                              │    (REST API)       │
-                              └─────────────────────┘
-                    │
-                    ▼
-               SeaweedFS (S3)
-
-Kafka 3.6 ◀──── Streaming ────▶ Iceberg Tables
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                                    QUERIES                                        │
+│            Spark SQL  •  Time Travel  •  Dashboards  •  Reports                   │
+└───────────────────────────────────────────────────────────────────────────────────┘
+                                        ▲
+                                        │
+┌──────────────────────┐    ┌───────────────────────────────────────────────────────┐
+│                      │    │                    COMPUTE: Spark 4.x                 │
+│  STREAMING           │    │                                                       │
+│                      │    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
+│  Kafka (:9092)       │───▶│  │   BRONZE    │─▶│   SILVER    │─▶│    GOLD     │   │
+│  └─ events topic     │    │  │ (raw ingest)│  │  (cleaned)  │  │ (aggregated)│   │
+│  └─ orders topic     │    │  └─────────────┘  └─────────────┘  └─────────────┘   │
+│                      │    │                                                       │
+│  Zookeeper (:2181)   │    │  Spark 4.0 (:7077, UI :8080)                         │
+│                      │    │  Spark 4.1 (:7078, UI :8082)                         │
+│  (direct to Spark,   │    └──────────────────────────┬────────────────────────────┘
+│   not via catalog)   │                               │
+└──────────────────────┘                               │ Iceberg API
+                                                       ▼
+                            ┌───────────────────────────────────────────────────────┐
+                            │                 CATALOG: Iceberg Metadata             │
+                            │                                                       │
+                            │  PostgreSQL (:5432)          Unity Catalog (:8080)    │
+                            │  └─ JDBC catalog             └─ REST catalog          │
+                            │  └─ table schemas            └─ multi-engine access   │
+                            │  └─ snapshots, partitions                             │
+                            └──────────────────────────┬────────────────────────────┘
+                                                       │
+                                                       ▼
+                            ┌───────────────────────────────────────────────────────┐
+                            │               STORAGE: SeaweedFS (S3 API)             │
+                            │                                                       │
+                            │  s3://lakehouse/warehouse/                            │
+                            │  ├── bronze/*.parquet                                 │
+                            │  ├── silver/*.parquet                                 │
+                            │  └── gold/*.parquet                                   │
+                            │                                                       │
+                            │  :8333 (S3-compatible object storage)                 │
+                            └───────────────────────────────────────────────────────┘
 ```
 
-**Catalog Options:**
-- **PostgreSQL JDBC** (default): Direct SQL, Spark-only
-- **Unity Catalog OSS** (optional): REST API, works with DuckDB, Trino, Dremio
+**How It Works:**
+1. **Streaming** → Kafka feeds events directly to Spark (not via catalog)
+2. **Compute** → Spark transforms data through Bronze → Silver → Gold layers
+3. **Catalog** → PostgreSQL or Unity Catalog manages Iceberg table metadata
+4. **Storage** → SeaweedFS stores Parquet files accessed via Iceberg
 
-**Medallion Architecture:**
-- `iceberg.bronze.*` - Raw data
-- `iceberg.silver.*` - Cleaned/transformed
-- `iceberg.gold.*` - Business-ready
+**Catalog Options:**
+| Feature | PostgreSQL JDBC | Unity Catalog |
+|---------|-----------------|---------------|
+| Protocol | Direct SQL | REST API |
+| Clients | Spark only | Spark, DuckDB, Trino, Dremio |
+| Auth | Database credentials | OAuth / Token |
+| Setup | Simpler | More flexible |
 
 ## Ports
 
