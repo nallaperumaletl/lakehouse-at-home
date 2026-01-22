@@ -47,7 +47,7 @@ pause
 echo "Let's run a dry-run to validate:"
 pause
 
-echo -e "${YELLOW}$ docker exec spark-master-41 spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml${NC}"
+echo -e "${YELLOW}$ docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml${NC}"
 docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J' || true
 
 echo ""
@@ -82,6 +82,6 @@ banner "Demo Complete!"
 
 echo "Key takeaway: Always run dry-run before run!"
 echo ""
-echo "  spark-pipelines dry-run --spec pipeline.yml  # Validate first"
-echo "  spark-pipelines run --spec pipeline.yml      # Then execute"
+echo "  /opt/spark/bin/spark-pipelines dry-run --spec pipeline.yml  # Validate first"
+echo "  /opt/spark/bin/spark-pipelines run --spec pipeline.yml      # Then execute"
 echo ""
