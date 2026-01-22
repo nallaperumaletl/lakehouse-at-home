@@ -157,10 +157,6 @@ for jar_entry in "${JAR_LIST[@]}"; do
     fi
 done
 
-# Lance Spark Bundle (for multimodal/vector workloads)
-echo "⬇️  Lance Spark Bundle 4.0_2.13-0.0.15..."
-wget -q --show-progress https://github.com/lancedb/lance/releases/download/v0.0.15/lance-spark-bundle-4.0_2.13-0.0.15.jar
-
 echo ""
 echo "================================"
 
