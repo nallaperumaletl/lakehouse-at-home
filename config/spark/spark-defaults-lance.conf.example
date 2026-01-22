@@ -1,0 +1,71 @@
+# =============================================================================
+# Spark Configuration with Iceberg + Lance Support
+# =============================================================================
+# This configuration enables both Iceberg (structured data) and Lance
+# (multimodal/vector) catalogs for a unified lakehouse architecture.
+#
+# Copy to spark-defaults.conf and update credentials before use.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Iceberg Catalog Configuration
+# -----------------------------------------------------------------------------
+spark.sql.extensions                org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+spark.sql.catalog.iceberg           org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.iceberg.type      jdbc
+spark.sql.catalog.iceberg.uri       jdbc:postgresql://localhost:5432/iceberg_catalog
+spark.sql.catalog.iceberg.warehouse s3a://lakehouse/warehouse
+spark.sql.catalog.iceberg.jdbc.user your_username
+spark.sql.catalog.iceberg.jdbc.password your_password
+spark.sql.catalog.iceberg.jdbc.schema-version  V1
+
+# -----------------------------------------------------------------------------
+# Lance Catalog Configuration
+# -----------------------------------------------------------------------------
+# Lance catalog for multimodal AI workloads (embeddings, vectors, images)
+spark.sql.catalog.lance             com.lancedb.lance.spark.LanceCatalog
+spark.sql.catalog.lance.type        lance
+spark.sql.catalog.lance.warehouse   s3a://lakehouse/lance
+
+# Lance S3 configuration (uses same SeaweedFS backend as Iceberg)
+# Note: Lance uses its own S3 client, separate from Hadoop's
+spark.sql.catalog.lance.io.s3.endpoint           http://localhost:8333
+spark.sql.catalog.lance.io.s3.access-key-id      your_access_key
+spark.sql.catalog.lance.io.s3.secret-access-key  your_secret_key
+spark.sql.catalog.lance.io.s3.region             us-east-1
+spark.sql.catalog.lance.io.s3.path-style-access  true
+
+# -----------------------------------------------------------------------------
+# S3 Configuration for SeaweedFS (Hadoop/Iceberg)
+# -----------------------------------------------------------------------------
+spark.hadoop.fs.s3a.endpoint        http://localhost:8333
+spark.hadoop.fs.s3a.access.key      your_access_key
+spark.hadoop.fs.s3a.secret.key      your_secret_key
+spark.hadoop.fs.s3a.path.style.access true
+spark.hadoop.fs.s3a.impl            org.apache.hadoop.fs.s3a.S3AFileSystem
+spark.hadoop.fs.s3a.connection.ssl.enabled false
+
+# -----------------------------------------------------------------------------
+# JAR Configuration
+# -----------------------------------------------------------------------------
+# Iceberg + Lance JARs (all from /opt/spark/jars-extra)
+spark.jars  /opt/spark/jars-extra/iceberg-spark-runtime-4.0_2.13-1.10.0.jar,/opt/spark/jars-extra/hadoop-aws-3.4.1.jar,/opt/spark/jars-extra/aws-java-sdk-bundle-1.12.780.jar,/opt/spark/jars-extra/bundle-2.24.6.jar,/opt/spark/jars-extra/postgresql-42.7.4.jar,/opt/spark/jars-extra/lance-spark-bundle-4.0_2.13-0.0.15.jar
+
+# -----------------------------------------------------------------------------
+# Performance Tuning
+# -----------------------------------------------------------------------------
+spark.driver.memory                 4g
+spark.executor.memory               8g
+spark.executor.cores                2
+spark.sql.warehouse.dir             /opt/spark-data/warehouse
+
+# Arrow optimization for Lance interop
+spark.sql.execution.arrow.pyspark.enabled  true
+spark.sql.execution.arrow.maxRecordsPerBatch 10000
+
+# -----------------------------------------------------------------------------
+# Event Logging
+# -----------------------------------------------------------------------------
+spark.eventLog.enabled              true
+spark.eventLog.dir                  /opt/spark-data/logs
+spark.history.fs.logDirectory       /opt/spark-data/logs

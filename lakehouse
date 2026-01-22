@@ -747,6 +747,91 @@ cmd_consumer() {
         /scripts/test-kafka.py
 }
 
+# Lance commands (multimodal/vector workloads)
+cmd_lance() {
+    local subcmd=$1
+    shift
+
+    case $subcmd in
+        start)
+            header "STARTING LANCE-ENABLED SPARK"
+            echo -e "${YELLOW}Starting Lance Spark cluster...${NC}"
+            docker compose -f docker-compose-lance.yml up -d
+            echo ""
+            wait_for_service "Lance Spark Master" "nc -z localhost 8084" 30
+            echo -e "\n${GREEN}Lance cluster ready!${NC}"
+            echo "  Spark UI: http://localhost:8084"
+            ;;
+        start-prod)
+            header "STARTING LANCE PRODUCTION STACK"
+            echo -e "${YELLOW}Starting Lance production stack with monitoring...${NC}"
+            docker compose -f docker-compose-lance-prod.yml up -d
+            echo ""
+            wait_for_service "Lance Spark Master" "nc -z localhost 8084" 30
+            wait_for_service "Prometheus" "nc -z localhost 9091" 30
+            wait_for_service "Grafana" "nc -z localhost 3000" 30
+            echo -e "\n${GREEN}Lance production stack ready!${NC}"
+            echo "  Spark UI:   http://localhost:8084"
+            echo "  Prometheus: http://localhost:9091"
+            echo "  Grafana:    http://localhost:3000 (admin/admin)"
+            ;;
+        stop)
+            header "STOPPING LANCE SPARK"
+            docker compose -f docker-compose-lance.yml down 2>/dev/null || true
+            docker compose -f docker-compose-lance-prod.yml down 2>/dev/null || true
+            echo -e "${GREEN}Lance cluster stopped${NC}"
+            ;;
+        test)
+            header "TESTING LANCE"
+            echo -e "${YELLOW}Running Lance connectivity test...${NC}"
+            poetry run python scripts/test-lance.py --local
+            ;;
+        quickstart)
+            header "LANCE QUICKSTART"
+            echo -e "${YELLOW}Running Lance quickstart demo...${NC}"
+            poetry run python scripts/05-lance-quickstart.py
+            ;;
+        search)
+            header "LANCE SEMANTIC SEARCH"
+            echo -e "${YELLOW}Running semantic search demo...${NC}"
+            poetry run python scripts/08-semantic-search.py "$@"
+            ;;
+        status)
+            echo -e "${YELLOW}Lance Containers:${NC}"
+            check_container "spark-master-lance" || true
+            check_container "spark-worker-lance-1" || true
+            check_container "spark-worker-lance-2" || true
+            check_container "lance-monitor" || true
+            check_container "prometheus" || true
+            check_container "grafana" || true
+            echo ""
+            echo -e "${YELLOW}Lance Ports:${NC}"
+            echo "  Spark Master UI:  8084"
+            echo "  Lance Metrics:    9090"
+            echo "  Prometheus:       9091"
+            echo "  Grafana:          3000"
+            ;;
+        *)
+            echo "Usage: lakehouse lance <command> [options]"
+            echo ""
+            echo "Commands:"
+            echo "  start          Start Lance-enabled Spark cluster"
+            echo "  start-prod     Start production stack with monitoring"
+            echo "  stop           Stop Lance cluster"
+            echo "  status         Show Lance container status"
+            echo "  test           Run Lance connectivity test"
+            echo "  quickstart     Run Lance quickstart demo"
+            echo "  search         Run semantic search demo"
+            echo ""
+            echo "Examples:"
+            echo "  lakehouse lance start"
+            echo "  lakehouse lance test"
+            echo "  lakehouse lance quickstart"
+            exit 1
+            ;;
+    esac
+}
+
 # Testdata commands
 cmd_testdata() {
     local subcmd=$1
@@ -1119,6 +1204,7 @@ cmd_help() {
     echo "  producer            Start Kafka event producer"
     echo "  consumer            Start Spark streaming consumer"
     echo "  testdata <cmd>      Test data generation (generate|stream|load|stats|clean)"
+    echo "  lance <cmd>         Lance/LanceDB multimodal commands"
     echo "  help                Show this help"
     echo ""
     echo "Options:"
@@ -1149,6 +1235,15 @@ cmd_help() {
     echo "  testdata stats      Show dataset statistics"
     echo "  testdata clean      Remove generated data"
     echo ""
+    echo "Lance Commands (Multimodal/Vector):"
+    echo "  lance start         Start Lance-enabled Spark cluster"
+    echo "  lance start-prod    Start production stack with monitoring"
+    echo "  lance stop          Stop Lance cluster"
+    echo "  lance status        Show Lance container status"
+    echo "  lance test          Run Lance connectivity test"
+    echo "  lance quickstart    Run Lance quickstart demo"
+    echo "  lance search        Run semantic search demo"
+    echo ""
     echo "Examples:"
     echo "  lakehouse setup"
     echo "  lakehouse check-config"
@@ -1161,6 +1256,8 @@ cmd_help() {
     echo "  lakehouse start unity-catalog"
     echo "  lakehouse testdata generate --days 30"
     echo "  lakehouse testdata stream --speed 100"
+    echo "  lakehouse lance start"
+    echo "  lakehouse lance quickstart"
 }
 
 # Main
@@ -1208,6 +1305,9 @@ case ${1:-help} in
         ;;
     testdata)
         cmd_testdata "${@:2}"
+        ;;
+    lance)
+        cmd_lance "${@:2}"
         ;;
     help|*)
         cmd_help

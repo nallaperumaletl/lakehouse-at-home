@@ -1,0 +1,81 @@
+# =============================================================================
+# Prometheus Configuration for Lance + Lakehouse Monitoring
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'lakehouse'
+    env: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# Scrape configurations
+scrape_configs:
+  # -------------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # -------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9091']
+
+  # -------------------------------------------------------------------------
+  # Lance Monitoring Server
+  # -------------------------------------------------------------------------
+  - job_name: 'lance'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # -------------------------------------------------------------------------
+  # Spark Master
+  # -------------------------------------------------------------------------
+  - job_name: 'spark-master'
+    static_configs:
+      - targets: ['localhost:8084']
+    metrics_path: /metrics/prometheus
+    scrape_interval: 30s
+
+  # -------------------------------------------------------------------------
+  # Spark Workers
+  # -------------------------------------------------------------------------
+  - job_name: 'spark-workers'
+    static_configs:
+      - targets:
+        - 'localhost:8085'
+        - 'localhost:8086'
+        - 'localhost:8087'
+    metrics_path: /metrics/prometheus
+    scrape_interval: 30s
+
+  # -------------------------------------------------------------------------
+  # Kafka (if using kafka-exporter)
+  # -------------------------------------------------------------------------
+  # - job_name: 'kafka'
+  #   static_configs:
+  #     - targets: ['localhost:9308']
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL (if using postgres-exporter)
+  # -------------------------------------------------------------------------
+  # - job_name: 'postgresql'
+  #   static_configs:
+  #     - targets: ['localhost:9187']
+
+  # -------------------------------------------------------------------------
+  # SeaweedFS (if metrics enabled)
+  # -------------------------------------------------------------------------
+  # - job_name: 'seaweedfs'
+  #   static_configs:
+  #     - targets: ['localhost:9325']
