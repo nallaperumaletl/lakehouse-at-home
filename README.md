@@ -122,6 +122,7 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | [Databricks Deployment](docs/deployment/databricks.md) | Managed Spark platform |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
 | [Security](SECURITY.md) | Security guidelines for contributors |
+| [AI Skills](https://github.com/lisancao/lakehouse-skills) | AI assistant references (SDP, etc.) |
 
 ## Architecture
 
