@@ -48,13 +48,13 @@ class TestAirflowDockerSetup:
             assert service in services, f"Missing required service: {service}"
 
     def test_docker_compose_uses_correct_port(self):
-        """Airflow webserver should use port 8081 to avoid Spark conflict."""
+        """Airflow webserver should use port 8085 to avoid Spark conflict."""
         compose_path = os.path.join(PROJECT_ROOT, "docker-compose-airflow.yml")
         with open(compose_path) as f:
             content = f.read()
 
-        # Check that port 8081 is configured (not default 8080)
-        assert "8081" in content, "Airflow should use port 8081"
+        # Check that port 8085 is configured (avoids Spark 4.0 UI and worker ports)
+        assert "8085" in content, "Airflow should use port 8085"
 
     def test_dockerfile_exists(self):
         """Airflow Dockerfile should exist."""

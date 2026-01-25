@@ -54,4 +54,4 @@ echo "✓ Variables configured"
 
 echo ""
 echo "Airflow connections setup complete!"
-echo "Access Airflow UI at: http://localhost:8081"
+echo "Access Airflow UI at: http://localhost:8085"

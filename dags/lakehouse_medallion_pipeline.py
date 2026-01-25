@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import BranchPythonOperator
-from airflow.providers.apache.kafka.sensors.kafka import AwaitMessageSensor
+# Note: AwaitMessageSensor has limited parameter support, using BashOperator for Kafka check
 from airflow.models import Variable
 
 default_args = {
@@ -44,15 +44,14 @@ with DAG(
     tags=["lakehouse", "iceberg", "spark"],
 ) as dag:
 
-    # Wait for data availability (optional - can be triggered manually)
-    wait_for_kafka_data = AwaitMessageSensor(
-        task_id="wait_for_kafka_data",
-        topics=["orders"],
-        kafka_config_id="kafka_default",
-        apply_function="airflow.providers.apache.kafka.sensors.kafka.AwaitMessageSensor.default_apply_function",
-        xcom_push_key=None,
-        timeout=300,  # 5 minutes
-        soft_fail=True,  # Don't fail the DAG if no messages
+    # Check Kafka availability (soft-fail if Kafka is down)
+    check_kafka = BashOperator(
+        task_id="check_kafka_availability",
+        bash_command="""
+            timeout 10 bash -c 'echo "" | nc -w 5 localhost 9092' \
+                && echo "Kafka is available" \
+                || echo "Kafka not available - continuing anyway"
+        """,
     )
 
     # Branch based on Spark version
@@ -95,5 +94,5 @@ with DAG(
     )
 
     # Task dependencies
-    wait_for_kafka_data >> choose_spark >> [run_pipeline_spark41, run_pipeline_spark40]
+    check_kafka >> choose_spark >> [run_pipeline_spark41, run_pipeline_spark40]
     [run_pipeline_spark41, run_pipeline_spark40] >> verify_tables

@@ -417,7 +417,7 @@ is_service_healthy() {
 
 # Check Airflow health via API
 is_airflow_healthy() {
-    curl -s --connect-timeout 2 http://localhost:8081/health 2>/dev/null | grep -q '"healthy"'
+    curl -s --connect-timeout 2 http://localhost:8085/health 2>/dev/null | grep -q '"healthy"'
 }
 
 # Check if container is running (silent, returns 0/1)
@@ -494,7 +494,7 @@ cmd_status_human() {
     check_container "zookeeper"
 
     echo -e "\n${YELLOW}Airflow Containers:${NC}"
-    check_container "airflow-webserver" && check_service airflow 8081 "Airflow UI" || true
+    check_container "airflow-webserver" && check_service airflow 8085 "Airflow UI" || true
     check_container "airflow-scheduler"
     check_container "airflow-triggerer"
 
@@ -506,7 +506,7 @@ cmd_status_human() {
     echo "  Spark 4.1:        7078, 8082 (UI), 8083 (Worker UI)"
     echo "  Kafka:            9092"
     echo "  Zookeeper:        2181"
-    echo "  Airflow:          8081 (UI)"
+    echo "  Airflow:          8085 (UI)"
 
     echo -e "\n${YELLOW}Configurations:${NC}"
     echo "  Spark 4.0:       docker-compose.yml"
@@ -677,8 +677,8 @@ cmd_start() {
             echo -e "${YELLOW}Starting Airflow...${NC}"
             mkdir -p logs/airflow
             docker compose -f docker-compose-airflow.yml up -d --build
-            wait_for_service "Airflow" "curl -s http://localhost:8081/health" 120
-            echo -e "${GREEN}Airflow UI available at: http://localhost:8081${NC}"
+            wait_for_service "Airflow" "curl -s http://localhost:8085/health" 120
+            echo -e "${GREEN}Airflow UI available at: http://localhost:8085${NC}"
             echo -e "${YELLOW}Default credentials: admin/admin (change in .env)${NC}"
             ;;
     esac
@@ -866,7 +866,7 @@ cmd_test() {
 
     echo -e "\n${YELLOW}6. Testing Airflow (optional)...${NC}"
     if docker ps --format '{{.Names}}' | grep -q '^airflow-webserver$'; then
-        if curl -s --connect-timeout 5 http://localhost:8081/health | grep -q '"healthy"'; then
+        if curl -s --connect-timeout 5 http://localhost:8085/health | grep -q '"healthy"'; then
             echo -e "   ${GREEN}✓${NC} Airflow webserver healthy"
             if docker ps --format '{{.Names}}' | grep -q '^airflow-scheduler$'; then
                 echo -e "   ${GREEN}✓${NC} Airflow scheduler running"
@@ -1313,7 +1313,7 @@ cmd_help() {
     echo ""
     echo "Airflow:"
     echo "  Apache Airflow for workflow orchestration:"
-    echo "  - Web UI on port 8081 (default: admin/admin)"
+    echo "  - Web UI on port 8085 (default: admin/admin)"
     echo "  - Orchestrates Spark jobs, Kafka sensors, Iceberg maintenance"
     echo "  - DAGs in dags/ directory"
     echo "  - Config: docker-compose-airflow.yml"
