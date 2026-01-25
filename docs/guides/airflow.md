@@ -388,8 +388,13 @@ This setup uses Airflow 3.1.6 which has breaking changes from 2.x:
 
 ### Docker Image Notes
 - Base image: `apache/airflow:3.1.6-python3.12`
-- Java: Uses Java 17 (Java 21 not available in base image repos)
-- Spark: 4.1.0 included for spark-submit
+- Java: **17** (for local Spark client operations)
+- Spark client: 4.1.0 included for potential local spark-submit
+
+**Note on Java versions:** The Airflow container uses Java 17 because:
+1. Spark jobs run via `docker exec spark-master-41 spark-submit`, so they use the Spark container's JVM (Java 21 for Spark 4.1)
+2. Java 17 is available in the Airflow base image (Java 21 is not)
+3. Java 17 is sufficient for Airflow's needs (scheduling, API server)
 
 ## See Also
 

@@ -153,6 +153,11 @@ Do not change without testing:
 - Airflow: **3.1.6** (breaking changes from 2.x - see `docs/guides/airflow.md`)
 - Poetry: **2.1.0**
 
+**Java versions** (don't change - these are set by official images):
+- Spark 4.0 container: Java 17 (from `apache/spark:4.0.1-scala2.13-java17-*`)
+- Spark 4.1 container: Java 21 (from `apache/spark:4.1.0-scala2.13-java21-*`)
+- Airflow container: Java 17 (sufficient for scheduling; Spark jobs run in Spark containers)
+
 ## Security
 
 **NEVER commit credentials.** See `SECURITY.md` for full guidelines.
