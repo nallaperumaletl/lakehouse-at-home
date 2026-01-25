@@ -7,8 +7,8 @@ Supports both Spark 4.0 and 4.1 clusters.
 
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import BranchPythonOperator
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.providers.standard.operators.python import BranchPythonOperator
 # Note: AwaitMessageSensor has limited parameter support, using BashOperator for Kafka check
 from airflow.models import Variable
 
@@ -38,7 +38,7 @@ with DAG(
     dag_id="lakehouse_medallion_pipeline",
     default_args=default_args,
     description="Bronze -> Silver -> Gold medallion pipeline",
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["lakehouse", "iceberg", "spark"],

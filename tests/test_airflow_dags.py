@@ -104,7 +104,7 @@ class TestDAGStructure:
         assert 'dag_id="lakehouse_medallion_pipeline"' in content
 
         # Check schedule
-        assert 'schedule_interval="@daily"' in content
+        assert 'schedule="@daily"' in content
 
         # Check catchup is disabled
         assert "catchup=False" in content
@@ -138,7 +138,7 @@ class TestDAGStructure:
         assert 'dag_id="iceberg_compact_on_demand"' in content
 
         # Check no schedule (manual only)
-        assert "schedule_interval=None" in content
+        assert "schedule=None" in content
 
 
 class TestDAGDependencies:

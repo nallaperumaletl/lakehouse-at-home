@@ -232,8 +232,8 @@ expire_snapshots = BashOperator(
 ### Health Checks
 
 ```bash
-# Webserver health
-curl http://localhost:8085/health
+# API server health (Airflow 3.x)
+curl http://localhost:8085/api/v2/monitor/health
 
 # Scheduler health
 curl http://localhost:8974/health

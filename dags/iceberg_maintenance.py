@@ -9,7 +9,7 @@ Performs routine maintenance tasks on Iceberg tables:
 
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.providers.standard.operators.bash import BashOperator
 from airflow.models import Variable
 
 default_args = {
@@ -89,7 +89,7 @@ with DAG(
     dag_id="iceberg_maintenance",
     default_args=default_args,
     description="Iceberg table maintenance: snapshots, orphans, compaction",
-    schedule_interval="0 3 * * *",  # Daily at 3 AM
+    schedule="0 3 * * *",  # Daily at 3 AM
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["lakehouse", "iceberg", "maintenance"],
@@ -120,7 +120,7 @@ with DAG(
     dag_id="iceberg_compact_on_demand",
     default_args=default_args,
     description="On-demand Iceberg file compaction",
-    schedule_interval=None,  # Manual trigger only
+    schedule=None,  # Manual trigger only
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["lakehouse", "iceberg", "maintenance"],

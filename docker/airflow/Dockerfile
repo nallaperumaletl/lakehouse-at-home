@@ -6,13 +6,13 @@ USER root
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
-    openjdk-21-jre-headless \
+    openjdk-17-jre-headless \
     curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Set JAVA_HOME for Spark (Java 21 for Spark 4.1)
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+# Set JAVA_HOME for Spark (Java 17 works with Spark 4.0 and 4.1)
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Download and install Spark (for spark-submit)
@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir \
     apache-airflow-providers-postgres==5.14.0 \
     apache-airflow-providers-apache-kafka==1.8.0 \
     apache-airflow-providers-docker==3.14.0 \
-    apache-airflow-providers-http==4.14.0 \
+    apache-airflow-providers-http==5.6.3 \
     pyspark==4.1.0
 
 # Create directories
