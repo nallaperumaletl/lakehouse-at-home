@@ -8,7 +8,7 @@
 # Notes:
 # - Notebooks run Spark in local mode for learning/demonstration
 # - For cluster execution, use the standalone scripts via spark-submit:
-#   docker exec spark-master-41 spark-submit /scripts/pipeline_spark41.py
+#   docker exec spark-master-41 spark-submit /scripts/pipelines/pipeline_spark41.py
 
 services:
   jupyter:

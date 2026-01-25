@@ -246,7 +246,7 @@ If similar pipelines already exist, check their column references:
 ```bash
 # Search for how others handled the same data
 grep -n "orders_90d" scripts/*.py
-grep -n "\.ts" scripts/pipeline_sdp.py
+grep -n "\.ts" scripts/pipelines/pipeline_sdp.py
 ```
 
 ### Common Schema Patterns
@@ -1487,4 +1487,4 @@ spark: Any
 
 - [Apache Spark 4.1 Documentation - Declarative Pipelines](https://spark.apache.org/docs/4.1.0/declarative-pipelines.html)
 - [Lakehouse Stack Pipelines Guide](../../docs/guides/pipelines.md)
-- Example Implementation: `scripts/pipeline_sdp.py`
+- Example Implementation: `scripts/pipelines/pipeline_sdp.py`

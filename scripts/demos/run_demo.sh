@@ -61,19 +61,19 @@ banner "PART 2: Dry Run an Existing Pipeline"
 echo "Now let's look at our pre-built demo pipeline:"
 pause
 
-run_cmd "cat scripts/demo/spark-pipeline.yml"
+run_cmd "cat scripts/demos/spark-pipeline.yml"
 
 echo ""
 echo -e "${GREEN}And the pipeline code:${NC}"
 pause
 
-run_cmd "cat scripts/demo/transformations/sales_pipeline.py"
+run_cmd "cat scripts/demos/transformations/sales_pipeline.py"
 
 echo ""
 echo -e "${GREEN}Let's validate with a dry-run:${NC}"
 pause
 
-run_cmd "docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J'"
+run_cmd "docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J'"
 
 echo ""
 echo -e "${GREEN}Dry-run passed! The pipeline graph is valid.${NC}"
@@ -87,7 +87,7 @@ banner "PART 3: Execute the Pipeline"
 echo "Now let's run the pipeline for real:"
 pause
 
-run_cmd "docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/demo/spark-pipeline.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J'"
+run_cmd "docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/demos/spark-pipeline.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J'"
 
 echo ""
 echo -e "${GREEN}Pipeline executed successfully!${NC}"

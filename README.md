@@ -231,7 +231,7 @@ poetry run pytest tests/integration/ -v               # Integration tests
 poetry run pytest -m security -v                      # Security tests
 
 # Multi-version Spark testing
-./scripts/test-spark-versions.sh -v 4.0 -v 4.1 -t all
+./scripts/connectivity/test-spark-versions.sh -v 4.0 -v 4.1 -t all
 ```
 
 ## Security

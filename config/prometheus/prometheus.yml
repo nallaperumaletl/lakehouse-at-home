@@ -1,5 +1,5 @@
 # =============================================================================
-# Prometheus Configuration for Lance + Lakehouse Monitoring
+# Prometheus Configuration for Lakehouse Monitoring
 # =============================================================================
 
 global:
@@ -28,15 +28,6 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9091']
-
-  # -------------------------------------------------------------------------
-  # Lance Monitoring Server
-  # -------------------------------------------------------------------------
-  - job_name: 'lance'
-    static_configs:
-      - targets: ['localhost:9090']
-    metrics_path: /metrics
-    scrape_interval: 30s
 
   # -------------------------------------------------------------------------
   # Spark Master

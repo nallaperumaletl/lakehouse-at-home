@@ -98,7 +98,7 @@ Key environment variables passed to containers:
 ```
 scripts/
 ├── examples/        # Learning tutorials (01-04)
-├── quickstarts/     # Self-contained demos (iceberg, lance)
+├── quickstarts/     # Tutorials and demos
 ├── tools/           # Utilities (download-jars.sh, kafka-producer.py)
 ├── connectivity/    # Integration tests (test-iceberg.py, test-kafka.py)
 └── testdata/        # Test data generation module
