@@ -41,8 +41,8 @@ Self-hostable data lakehouse: Spark 4.x + Iceberg 1.10 + Kafka 3.6 + PostgreSQL 
 ./lakehouse stop unity-catalog   # Stop Unity Catalog
 ./lakehouse logs unity-catalog   # View Unity Catalog logs
 
-# Airflow (optional)
-./lakehouse start airflow   # Start Airflow scheduler and webserver
+# Airflow (optional - requires Airflow 3.x)
+./lakehouse start airflow   # Start Airflow scheduler and API server
 ./lakehouse stop airflow    # Stop Airflow
 ./lakehouse logs airflow    # View Airflow logs
 
@@ -150,6 +150,7 @@ Do not change without testing:
 - AWS SDK v2: **2.24.6** (exact for Hadoop 3.4.1)
 - Iceberg: **1.10.0**
 - Spark: **4.0.1** or **4.1.0** (Scala 2.13)
+- Airflow: **3.1.6** (breaking changes from 2.x - see `docs/guides/airflow.md`)
 - Poetry: **2.1.0**
 
 ## Security

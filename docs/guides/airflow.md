@@ -2,13 +2,17 @@
 
 Orchestrate Spark jobs, Kafka sensors, and Iceberg maintenance with Apache Airflow 3.x.
 
+## Version
+
+This setup uses **Airflow 3.1.6** with Python 3.12. See [Airflow 3.x Notes](#airflow-3x-notes) for breaking changes from 2.x.
+
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                      Airflow (port 8085)                     │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
-│  │  Webserver  │  │  Scheduler  │  │     Triggerer       │   │
+│  │ API Server  │  │  Scheduler  │  │     Triggerer       │   │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘   │
 └──────────────────────────────────────────────────────────────┘
          │                   │                    │
@@ -152,12 +156,12 @@ docker exec airflow-webserver airflow dags trigger iceberg_compact_on_demand \
 
 Place DAG files in `dags/` directory. They auto-sync to Airflow.
 
-### Basic DAG Template
+### Basic DAG Template (Airflow 3.x)
 
 ```python
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.providers.standard.operators.bash import BashOperator
 from airflow.models import Variable
 
 default_args = {
@@ -173,7 +177,7 @@ SPARK_CONTAINER = "spark-master-41" if SPARK_VERSION == "4.1" else "spark-master
 with DAG(
     dag_id="my_custom_dag",
     default_args=default_args,
-    schedule_interval="@daily",
+    schedule="@daily",  # Note: 'schedule' not 'schedule_interval' in Airflow 3.x
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["lakehouse", "custom"],
@@ -183,7 +187,7 @@ with DAG(
         task_id="run_spark_job",
         bash_command=f"""
             docker exec {SPARK_CONTAINER} /opt/spark/bin/spark-submit \
-                /scripts/my_script.py
+                /scripts/pipelines/my_script.py
         """,
     )
 ```
@@ -205,6 +209,8 @@ wait_for_data = AwaitMessageSensor(
 ### Iceberg Maintenance Tasks
 
 ```python
+from airflow.providers.standard.operators.bash import BashOperator
+
 # Expire old snapshots
 expire_snapshots = BashOperator(
     task_id="expire_snapshots",
@@ -312,6 +318,26 @@ docker exec airflow-webserver airflow db reset
 docker exec spark-master-41 /opt/spark/bin/spark-submit --version
 ```
 
+### Airflow 3.x Migration Issues
+
+**"Command airflow webserver has been removed"**
+- Airflow 3.x renamed `webserver` to `api-server`
+- Update docker-compose to use `command: api-server`
+
+**"DAG.__init__() got an unexpected keyword argument 'schedule_interval'"**
+- Airflow 3.x renamed `schedule_interval` to `schedule`
+- Update DAGs: `schedule_interval="@daily"` → `schedule="@daily"`
+
+**"Import error: airflow.operators.bash"**
+- Operators moved to providers in Airflow 3.x
+- Update: `from airflow.operators.bash import BashOperator`
+- To: `from airflow.providers.standard.operators.bash import BashOperator`
+
+**Health check returns error about /health endpoint**
+- Airflow 3.x changed health endpoint
+- Old: `/health`
+- New: `/api/v2/monitor/health`
+
 ## Ports
 
 | Service | Port |
@@ -331,6 +357,39 @@ docker exec spark-master-41 /opt/spark/bin/spark-submit --version
 | `config/airflow/` | Configuration scripts |
 | `docker/airflow/Dockerfile` | Custom Airflow image |
 | `docker-compose-airflow.yml` | Docker Compose config |
+
+## Airflow 3.x Notes
+
+This setup uses Airflow 3.1.6 which has breaking changes from 2.x:
+
+### Command Changes
+| Old (2.x) | New (3.x) |
+|-----------|-----------|
+| `airflow webserver` | `airflow api-server` |
+
+### DAG Parameter Changes
+| Old (2.x) | New (3.x) |
+|-----------|-----------|
+| `schedule_interval="@daily"` | `schedule="@daily"` |
+| `schedule_interval=None` | `schedule=None` |
+
+### Import Changes
+| Old (2.x) | New (3.x) |
+|-----------|-----------|
+| `from airflow.operators.bash import BashOperator` | `from airflow.providers.standard.operators.bash import BashOperator` |
+| `from airflow.operators.python import PythonOperator` | `from airflow.providers.standard.operators.python import PythonOperator` |
+| `from airflow.operators.python import BranchPythonOperator` | `from airflow.providers.standard.operators.python import BranchPythonOperator` |
+
+### API Changes
+| Old (2.x) | New (3.x) |
+|-----------|-----------|
+| `/health` | `/api/v2/monitor/health` |
+| `AIRFLOW__WEBSERVER__WEB_SERVER_PORT` | `AIRFLOW__API__PORT` |
+
+### Docker Image Notes
+- Base image: `apache/airflow:3.1.6-python3.12`
+- Java: Uses Java 17 (Java 21 not available in base image repos)
+- Spark: 4.1.0 included for spark-submit
 
 ## See Also
 
