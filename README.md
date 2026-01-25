@@ -3,6 +3,8 @@
 A fully open-source, self-hostable data lakehouse for local development and testing of modern data workflows. Run production-grade infrastructure on your laptop with Apache Spark, Iceberg, and Kafka - no cloud account required. Includes a realistic data generation framework to test batch and streaming pipelines.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml/badge.svg)](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/lisancao/lakehouse-at-home/branch/main/graph/badge.svg)](https://codecov.io/gh/lisancao/lakehouse-at-home)
 
 **Why Lakehouse at Home?**
 - **Learn** data engineering with real tools, not toy examples
