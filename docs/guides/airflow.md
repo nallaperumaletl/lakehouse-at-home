@@ -36,7 +36,7 @@ Orchestrate Spark jobs, Kafka sensors, and Iceberg maintenance with Apache Airfl
 
 # 3. Access UI
 open http://localhost:8085
-# Login: admin / admin (default)
+# Login with credentials from your .env file (AIRFLOW_ADMIN_USER/AIRFLOW_ADMIN_PASSWORD)
 ```
 
 ## Configuration
