@@ -57,7 +57,7 @@ jobs:
       - name: Validate shell scripts
         run: |
           bash -n lakehouse
-          bash -n scripts/download-jars.sh
+          bash -n scripts/tools/download-jars.sh
           echo "Shell syntax OK"
 
       - name: Validate docker-compose files
@@ -230,17 +230,17 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: jars/
-          key: jars-${{ hashFiles('scripts/download-jars.sh') }}
+          key: jars-${{ hashFiles('scripts/tools/download-jars.sh') }}
           restore-keys: |
             jars-
 
       - name: Download JARs (if not cached)
         run: |
           if [ ! -f "jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar" ]; then
-            bash scripts/download-jars.sh
+            bash scripts/tools/download-jars.sh
           else
             echo "JARs already cached"
-            bash scripts/download-jars.sh --verify-only || true
+            bash scripts/tools/download-jars.sh --verify-only || true
           fi
 
       - name: Test PostgreSQL connectivity
@@ -337,14 +337,14 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: jars/
-          key: jars-${{ hashFiles('scripts/download-jars.sh') }}
+          key: jars-${{ hashFiles('scripts/tools/download-jars.sh') }}
           restore-keys: |
             jars-
 
       - name: Download JARs (if not cached)
         run: |
           if [ ! -f "jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar" ]; then
-            bash scripts/download-jars.sh
+            bash scripts/tools/download-jars.sh
           fi
 
       - name: Test Spark ${{ matrix.spark-version }} container startup
@@ -426,7 +426,7 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: jars/
-          key: jars-${{ hashFiles('scripts/download-jars.sh') }}
+          key: jars-${{ hashFiles('scripts/tools/download-jars.sh') }}
 
       - name: Setup environment
         run: |
@@ -457,7 +457,7 @@ jobs:
           EOF
 
           if [ ! -f "jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar" ]; then
-            bash scripts/download-jars.sh
+            bash scripts/tools/download-jars.sh
           fi
 
       - name: Start Kafka
