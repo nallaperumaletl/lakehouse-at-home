@@ -9,9 +9,10 @@ Self-hostable data lakehouse: Spark 4.x + Iceberg 1.10 + Kafka 3.6 + PostgreSQL 
 | Document | Purpose |
 |----------|---------|
 | `docs/getting-started/` | Installation, quickstart, configuration |
-| `docs/guides/` | CLI reference, streaming, test data, multi-version Spark |
+| `docs/guides/` | CLI reference, streaming, test data, multi-version Spark, Airflow orchestration |
 | `docs/guides/unity-catalog.md` | Unity Catalog OSS setup and migration |
 | `docs/guides/pipelines.md` | Data pipelines (imperative vs declarative) |
+| `docs/guides/airflow.md` | Apache Airflow orchestration |
 | `docs/deployment/` | Local and AWS deployment |
 | `docs/architecture.md` | System design |
 | `docs/troubleshooting.md` | Common issues |
@@ -39,6 +40,11 @@ Self-hostable data lakehouse: Spark 4.x + Iceberg 1.10 + Kafka 3.6 + PostgreSQL 
 ./lakehouse start unity-catalog  # Start Unity Catalog REST server
 ./lakehouse stop unity-catalog   # Stop Unity Catalog
 ./lakehouse logs unity-catalog   # View Unity Catalog logs
+
+# Airflow (optional - requires Airflow 3.x)
+./lakehouse start airflow   # Start Airflow scheduler and API server
+./lakehouse stop airflow    # Stop Airflow
+./lakehouse logs airflow    # View Airflow logs
 
 # Database migrations
 ./lakehouse migrate        # Apply schema migrations
@@ -86,6 +92,8 @@ poetry run pytest -m spark41 -v                           # Spark 4.1 only
 | `docker-compose.yml` | Spark 4.0 cluster |
 | `docker-compose-kafka.yml` | Kafka + Zookeeper |
 | `docker-compose-unity-catalog.yml` | Unity Catalog OSS server |
+| `docker-compose-airflow.yml` | Apache Airflow orchestration |
+| `dags/` | Airflow DAG definitions |
 | `jars/` | Required JARs (~860MB) |
 | `scripts/quickstarts/` | Tutorials (01-04) and demos |
 | `scripts/connectivity/` | Integration test scripts (run via CLI) |
@@ -104,6 +112,8 @@ poetry run pytest -m spark41 -v                           # Spark 4.1 only
 Spark 4.x → Iceberg 1.10 → PostgreSQL (metadata) + SeaweedFS (data)
                 ↑               ↑
             Kafka 3.6      Unity Catalog (optional REST catalog)
+                ↑
+            Airflow (optional orchestration)
 ```
 
 **Catalog Options:**
@@ -126,6 +136,7 @@ Spark 4.x → Iceberg 1.10 → PostgreSQL (metadata) + SeaweedFS (data)
 | Kafka | 9092 |
 | Zookeeper | 2181 |
 | Unity Catalog | 8081 (when running with Spark) |
+| Airflow | 8085 |
 
 ## Code Style
 
@@ -139,7 +150,13 @@ Do not change without testing:
 - AWS SDK v2: **2.24.6** (exact for Hadoop 3.4.1)
 - Iceberg: **1.10.0**
 - Spark: **4.0.1** or **4.1.0** (Scala 2.13)
+- Airflow: **3.1.6** (breaking changes from 2.x - see `docs/guides/airflow.md`)
 - Poetry: **2.1.0**
+
+**Java versions** (don't change - these are set by official images):
+- Spark 4.0 container: Java 17 (from `apache/spark:4.0.1-scala2.13-java17-*`)
+- Spark 4.1 container: Java 21 (from `apache/spark:4.1.0-scala2.13-java21-*`)
+- Airflow container: Java 17 (sufficient for scheduling; Spark jobs run in Spark containers)
 
 ## Security
 
@@ -173,6 +190,7 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 | Container Startup | Verify Spark 4.0/4.1 images |
 | Integration Tests | PostgreSQL, Kafka connectivity |
 | Spark Matrix | Parallel Spark 4.0 + 4.1 tests |
+| Airflow Validation | DAG validation and container tests |
 | E2E Pipeline | Full stack test (master only) |
 
 ## Common Tasks
@@ -203,6 +221,7 @@ See `docs/troubleshooting.md` for full guide.
 ./lakehouse check-config      # Validate credentials
 docker logs spark-master-41   # Spark logs
 docker logs kafka             # Kafka logs
+docker logs airflow-webserver # Airflow logs
 ```
 
 ## For AI Agents

@@ -59,6 +59,10 @@ logs/
 *.swo
 *.swp
 
+# Airflow
+logs/airflow/
+dags/__pycache__/
+
 # Terraform
 terraform/.terraform/
 terraform/*.tfstate
