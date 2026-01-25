@@ -97,7 +97,7 @@ The built-in consumer shows live aggregations:
 
 ### Custom Streaming Jobs
 
-Example: `scripts/04-kafka-streaming.py`
+Example: `scripts/examples/04-kafka-streaming.py`
 
 ```python
 from pyspark.sql import SparkSession
