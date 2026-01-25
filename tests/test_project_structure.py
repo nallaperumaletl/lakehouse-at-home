@@ -15,25 +15,27 @@ class TestProjectStructure:
     def test_scripts_directory_structure(self):
         """Scripts should be organized into subdirectories."""
         scripts_dir = os.path.join(PROJECT_ROOT, "scripts")
-        expected_dirs = ["examples", "quickstarts", "tools", "connectivity", "testdata"]
+        expected_dirs = ["quickstarts", "tools", "connectivity", "testdata", "pipelines", "demos"]
 
         for subdir in expected_dirs:
             path = os.path.join(scripts_dir, subdir)
             assert os.path.isdir(path), f"Missing scripts/{subdir}/"
 
-    def test_examples_directory_has_tutorials(self):
-        """Examples directory should contain tutorial scripts."""
-        examples_dir = os.path.join(PROJECT_ROOT, "scripts", "examples")
+    def test_quickstarts_directory_has_tutorials(self):
+        """Quickstarts directory should contain tutorial scripts."""
+        qs_dir = os.path.join(PROJECT_ROOT, "scripts", "quickstarts")
         expected_files = [
             "01-basics.py",
             "02-transformations.py",
             "03-streaming-basic.py",
             "04-kafka-streaming.py",
+            "iceberg-spark-quickstart.py",
+            "unity-catalog-demo.py",
         ]
 
         for filename in expected_files:
-            path = os.path.join(examples_dir, filename)
-            assert os.path.isfile(path), f"Missing scripts/examples/{filename}"
+            path = os.path.join(qs_dir, filename)
+            assert os.path.isfile(path), f"Missing scripts/quickstarts/{filename}"
 
     def test_tools_directory_has_utilities(self):
         """Tools directory should contain utility scripts."""
@@ -47,20 +49,44 @@ class TestProjectStructure:
     def test_connectivity_directory_has_tests(self):
         """Connectivity directory should contain test scripts."""
         conn_dir = os.path.join(PROJECT_ROOT, "scripts", "connectivity")
-        expected_files = ["test-iceberg.py", "test-kafka.py"]
+        expected_files = [
+            "test-iceberg.py",
+            "test-kafka.py",
+            "test-seaweedfs.py",
+            "test-full-stack.py",
+            "test-streaming-iceberg.py",
+            "test-unity-catalog-live.py",
+            "test-spark-versions.sh",
+        ]
 
         for filename in expected_files:
             path = os.path.join(conn_dir, filename)
             assert os.path.isfile(path), f"Missing scripts/connectivity/{filename}"
 
-    def test_quickstarts_directory_has_demos(self):
-        """Quickstarts directory should contain demo scripts."""
-        qs_dir = os.path.join(PROJECT_ROOT, "scripts", "quickstarts")
-        expected_files = ["iceberg-spark-quickstart.py", "lance-quickstart.py"]
+    def test_pipelines_directory_has_pipelines(self):
+        """Pipelines directory should contain pipeline scripts."""
+        pipelines_dir = os.path.join(PROJECT_ROOT, "scripts", "pipelines")
+        expected_files = [
+            "pipeline_sdp.py",
+            "pipeline_spark40.py",
+            "pipeline_spark41.py",
+            "spark-pipeline.yml",
+        ]
 
         for filename in expected_files:
-            path = os.path.join(qs_dir, filename)
-            assert os.path.isfile(path), f"Missing scripts/quickstarts/{filename}"
+            path = os.path.join(pipelines_dir, filename)
+            assert os.path.isfile(path), f"Missing scripts/pipelines/{filename}"
+
+    def test_demos_directory_exists(self):
+        """Demos directory should exist with demo scripts."""
+        demos_dir = os.path.join(PROJECT_ROOT, "scripts", "demos")
+        assert os.path.isdir(demos_dir), "Missing scripts/demos/"
+
+        # Check for key demo files
+        expected_files = ["run_demo.sh", "README.md"]
+        for filename in expected_files:
+            path = os.path.join(demos_dir, filename)
+            assert os.path.isfile(path), f"Missing scripts/demos/{filename}"
 
 
 class TestKeyFiles:

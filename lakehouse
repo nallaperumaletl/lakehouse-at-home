@@ -835,7 +835,7 @@ cmd_test() {
 # Producer command
 cmd_producer() {
     header "STARTING KAFKA PRODUCER"
-    poetry run python scripts/kafka-producer.py
+    poetry run python scripts/tools/kafka-producer.py
 }
 
 # Consumer command
@@ -1148,8 +1148,8 @@ cmd_setup() {
     else
         echo -e "${GREEN}✓${NC} All required JARs present"
         # Verify JAR checksums if available
-        if [ -f "$PROJECT_ROOT/scripts/download-jars.sh" ]; then
-            bash "$PROJECT_ROOT/scripts/download-jars.sh" --verify-only 2>/dev/null && \
+        if [ -f "$PROJECT_ROOT/scripts/tools/download-jars.sh" ]; then
+            bash "$PROJECT_ROOT/scripts/tools/download-jars.sh" --verify-only 2>/dev/null && \
                 echo -e "  ${GREEN}✓${NC} JAR checksums verified" || \
                 echo -e "  ${YELLOW}!${NC} JAR checksum verification skipped"
         fi

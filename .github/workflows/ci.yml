@@ -541,10 +541,10 @@ jobs:
             --ignore-glob="*Live*" \
             || echo "Unity Catalog config tests completed"
 
-      - name: Validate new test scripts syntax
+      - name: Validate test scripts syntax
         run: |
-          python3 -m py_compile scripts/test-seaweedfs.py
-          python3 -m py_compile scripts/test-full-stack.py
-          python3 -m py_compile scripts/test-streaming-iceberg.py
-          python3 -m py_compile scripts/test-unity-catalog-live.py
+          python3 -m py_compile scripts/connectivity/test-seaweedfs.py
+          python3 -m py_compile scripts/connectivity/test-full-stack.py
+          python3 -m py_compile scripts/connectivity/test-streaming-iceberg.py
+          python3 -m py_compile scripts/connectivity/test-unity-catalog-live.py
           echo "All test scripts have valid syntax"

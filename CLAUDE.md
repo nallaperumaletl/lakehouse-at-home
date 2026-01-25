@@ -61,9 +61,9 @@ poetry run pytest -m security -v                          # Security only
 poetry run pytest -m spark41 -v                           # Spark 4.1 only
 
 # Multi-version Spark testing
-./scripts/test-spark-versions.sh                    # Default (Spark 4.1)
-./scripts/test-spark-versions.sh -v 4.0 -v 4.1     # Both versions
-./scripts/test-spark-versions.sh -t integration    # Integration tests
+./scripts/connectivity/test-spark-versions.sh                    # Default (Spark 4.1)
+./scripts/connectivity/test-spark-versions.sh -v 4.0 -v 4.1     # Both versions
+./scripts/connectivity/test-spark-versions.sh -t integration    # Integration tests
 ```
 
 ## Test Data
@@ -87,10 +87,11 @@ poetry run pytest -m spark41 -v                           # Spark 4.1 only
 | `docker-compose-kafka.yml` | Kafka + Zookeeper |
 | `docker-compose-unity-catalog.yml` | Unity Catalog OSS server |
 | `jars/` | Required JARs (~860MB) |
-| `scripts/examples/` | PySpark tutorials (01-04) |
-| `scripts/quickstarts/` | Self-contained demos |
+| `scripts/quickstarts/` | Tutorials (01-04) and demos |
+| `scripts/connectivity/` | Integration test scripts (run via CLI) |
+| `scripts/pipelines/` | Spark pipeline scripts (SDP, Spark 4.0/4.1) |
+| `scripts/demos/` | Interactive demo scripts |
 | `scripts/tools/` | Utility scripts (download-jars, etc) |
-| `scripts/connectivity/` | Integration tests |
 | `scripts/testdata/` | Test data generator |
 | `tests/` | Test suite |
 | `schemas/` | Database migrations |
@@ -178,7 +179,7 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 
 ```bash
 # Submit Spark job
-docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/examples/01-basics.py
+docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py
 
 # Download JARs (with retry)
 ./scripts/tools/download-jars.sh
