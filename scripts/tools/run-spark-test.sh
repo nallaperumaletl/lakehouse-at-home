@@ -2,7 +2,7 @@
 
 # Load credentials
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../.env"
+source "${SCRIPT_DIR}/../../.env"
 
 echo "Running Iceberg integration test with PySpark..."
 
@@ -23,7 +23,7 @@ docker exec -i spark-master /opt/spark/bin/spark-submit \
   --conf spark.hadoop.fs.s3a.secret.key=${S3_SECRET_KEY} \
   --conf spark.hadoop.fs.s3a.path.style.access=true \
   --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
-  /scripts/test-iceberg.py
+  /scripts/connectivity/test-iceberg.py
 
 echo ""
 echo "Test complete!"

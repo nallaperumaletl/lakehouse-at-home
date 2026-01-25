@@ -66,12 +66,12 @@ Required:
 # Submit to Spark 4.1
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
   --master spark://localhost:7078 \
-  /scripts/01-basics.py
+  /scripts/examples/01-basics.py
 
 # Submit to Spark 4.0
 docker exec spark-master /opt/spark/bin/spark-submit \
   --master spark://localhost:7077 \
-  /scripts/01-basics.py
+  /scripts/examples/01-basics.py
 ```
 
 ### Local spark-submit

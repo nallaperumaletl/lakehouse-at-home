@@ -43,7 +43,11 @@ Full docs in `docs/` directory:
 | `docker-compose-spark41.yml` | Spark 4.1 cluster |
 | `docker-compose-kafka.yml` | Kafka + Zookeeper |
 | `jars/` | Required JARs (~860MB) |
-| `scripts/` | PySpark examples |
+| `scripts/examples/` | PySpark tutorials (01-04) |
+| `scripts/quickstarts/` | Self-contained demos |
+| `scripts/tools/` | Utility scripts (download-jars, etc) |
+| `scripts/connectivity/` | Integration tests |
+| `scripts/testdata/` | Test data generator |
 | `terraform/` | AWS infrastructure |
 
 ## Architecture
@@ -92,10 +96,10 @@ Stored in `config/spark/spark-defaults.conf` (not in git):
 
 ```bash
 # Submit Spark job
-docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/01-basics.py
+docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/examples/01-basics.py
 
 # Download JARs
-./scripts/download-jars.sh
+./scripts/tools/download-jars.sh
 
 # Format Python
 poetry run black .

@@ -2,7 +2,7 @@
 
 set -e  # Exit on error
 
-JARS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../jars" && pwd)"
+JARS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../jars" && pwd)"
 
 echo "📦 Downloading JARs to ${JARS_DIR}..."
 mkdir -p "${JARS_DIR}"

@@ -146,7 +146,7 @@ Run with:
 ```bash
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.0 \
-  /scripts/04-kafka-streaming.py
+  /scripts/examples/04-kafka-streaming.py
 ```
 
 ### Write to Iceberg

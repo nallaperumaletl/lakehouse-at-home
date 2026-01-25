@@ -168,7 +168,7 @@ docker volume prune -f
 
 ```bash
 # Download JARs
-./scripts/download-jars.sh
+./scripts/tools/download-jars.sh
 
 # Verify JARs exist
 ls -la jars/

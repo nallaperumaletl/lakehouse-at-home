@@ -510,7 +510,7 @@ cmd_consumer() {
     docker exec "$master_container" /opt/spark/bin/spark-submit \
         --packages "$kafka_package" \
         --conf spark.jars.ivy=/opt/spark/.ivy2 \
-        /scripts/test-kafka.py
+        /scripts/connectivity/test-kafka.py
 }
 
 # Testdata commands
@@ -642,8 +642,8 @@ cmd_setup() {
 
     if [ $missing_jars -eq 1 ]; then
         echo -e "\n${YELLOW}Downloading missing JARs...${NC}"
-        if [ -f "$PROJECT_ROOT/scripts/download-jars.sh" ]; then
-            bash "$PROJECT_ROOT/scripts/download-jars.sh"
+        if [ -f "$PROJECT_ROOT/scripts/tools/download-jars.sh" ]; then
+            bash "$PROJECT_ROOT/scripts/tools/download-jars.sh"
         else
             echo -e "${RED}✗${NC} download-jars.sh not found"
             has_errors=1
