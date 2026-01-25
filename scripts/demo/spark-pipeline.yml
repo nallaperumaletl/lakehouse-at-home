@@ -1,0 +1,7 @@
+name: demo_pipeline
+catalog: iceberg
+database: bronze
+storage: file:///tmp/demo-pipeline-storage
+libraries:
+  - glob:
+      include: transformations/sales_pipeline.py

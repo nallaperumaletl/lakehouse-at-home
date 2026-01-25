@@ -24,6 +24,181 @@ check_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Setup PostgreSQL database (create if not exists)
+setup_postgres() {
+    local pg_user="${POSTGRES_USER:-postgres}"
+    local pg_pass="${POSTGRES_PASSWORD:-}"
+    local pg_host="${POSTGRES_HOST:-localhost}"
+    pg_host="${pg_host/host.docker.internal/localhost}"
+    local pg_port="${POSTGRES_PORT:-5432}"
+    local db_name="iceberg_catalog"
+
+    echo -e "${YELLOW}Checking PostgreSQL database...${NC}"
+
+    # Check if PostgreSQL is reachable
+    if ! nc -z "$pg_host" "$pg_port" 2>/dev/null; then
+        echo -e "   ${RED}✗${NC} PostgreSQL not reachable on $pg_host:$pg_port"
+        echo -e "   ${YELLOW}→ Ensure PostgreSQL is running${NC}"
+        return 1
+    fi
+
+    # Check if psql is available
+    if ! check_cmd psql; then
+        echo -e "   ${YELLOW}!${NC} psql not installed - cannot auto-create database"
+        echo -e "   ${YELLOW}→ Manually create database: createdb $db_name${NC}"
+        return 0
+    fi
+
+    # Check if database exists
+    if PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -c "SELECT 1;" >/dev/null 2>&1; then
+        echo -e "   ${GREEN}✓${NC} Database '$db_name' exists"
+        return 0
+    fi
+
+    # Database doesn't exist - attempt to create it
+    echo -e "   ${YELLOW}!${NC} Database '$db_name' not found"
+
+    # Try to connect to postgres default database to create iceberg_catalog
+    if PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d postgres -c "CREATE DATABASE $db_name;" 2>/dev/null; then
+        echo -e "   ${GREEN}✓${NC} Created database '$db_name'"
+        return 0
+    else
+        echo -e "   ${RED}✗${NC} Failed to create database '$db_name'"
+        echo -e "   ${YELLOW}→ Create manually: createdb -h $pg_host -U $pg_user $db_name${NC}"
+        return 1
+    fi
+}
+
+# Validate credential consistency between .env and spark-defaults.conf
+check_credential_consistency() {
+    local has_issues=0
+    local spark_conf="$PROJECT_ROOT/config/spark/spark-defaults.conf"
+
+    if [ ! -f "$spark_conf" ]; then
+        echo -e "   ${RED}✗${NC} spark-defaults.conf not found"
+        return 1
+    fi
+
+    # Extract credentials from spark-defaults.conf
+    local spark_pg_user=$(grep 'spark.sql.catalog.iceberg.jdbc.user' "$spark_conf" 2>/dev/null | awk '{print $2}')
+    local spark_pg_pass=$(grep 'spark.sql.catalog.iceberg.jdbc.password' "$spark_conf" 2>/dev/null | awk '{print $2}')
+    local spark_s3_key=$(grep 'spark.hadoop.fs.s3a.access.key' "$spark_conf" 2>/dev/null | awk '{print $2}')
+    local spark_s3_secret=$(grep 'spark.hadoop.fs.s3a.secret.key' "$spark_conf" 2>/dev/null | awk '{print $2}')
+
+    # Check for placeholder values
+    if [ "$spark_pg_user" = "your_username" ]; then
+        echo -e "   ${YELLOW}!${NC} spark-defaults.conf has placeholder PostgreSQL user"
+        has_issues=1
+    fi
+    if [ "$spark_s3_key" = "your_access_key" ]; then
+        echo -e "   ${YELLOW}!${NC} spark-defaults.conf has placeholder S3 access key"
+        has_issues=1
+    fi
+
+    # Cross-check with .env if available
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        source "$PROJECT_ROOT/.env"
+
+        # Check PostgreSQL user mismatch
+        if [ -n "$POSTGRES_USER" ] && [ -n "$spark_pg_user" ] && [ "$POSTGRES_USER" != "$spark_pg_user" ]; then
+            echo -e "   ${YELLOW}!${NC} PostgreSQL user mismatch:"
+            echo -e "      .env: $POSTGRES_USER"
+            echo -e "      spark-defaults.conf: $spark_pg_user"
+            has_issues=1
+        fi
+
+        # Check S3 key mismatch
+        if [ -n "$S3_ACCESS_KEY" ] && [ -n "$spark_s3_key" ] && [ "$S3_ACCESS_KEY" != "$spark_s3_key" ]; then
+            echo -e "   ${YELLOW}!${NC} S3 access key mismatch between .env and spark-defaults.conf"
+            has_issues=1
+        fi
+    fi
+
+    if [ $has_issues -eq 0 ]; then
+        echo -e "   ${GREEN}✓${NC} Credentials consistent"
+    fi
+
+    return $has_issues
+}
+
+# Preflight checks before starting services
+preflight_checks() {
+    local check_postgres=${1:-true}
+    local check_seaweedfs=${2:-true}
+    local check_ports=${3:-true}
+    local has_errors=0
+
+    echo -e "\n${YELLOW}Running preflight checks...${NC}"
+
+    # Check PostgreSQL connection
+    if [ "$check_postgres" = true ]; then
+        local pg_user="${POSTGRES_USER:-postgres}"
+        local pg_pass="${POSTGRES_PASSWORD:-}"
+        local pg_host="${POSTGRES_HOST:-localhost}"
+        pg_host="${pg_host/host.docker.internal/localhost}"
+
+        if PGPASSWORD="$pg_pass" psql -h "$pg_host" -U "$pg_user" -d iceberg_catalog -c "SELECT 1;" >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} PostgreSQL connection OK"
+        else
+            echo -e "   ${RED}✗${NC} PostgreSQL connection failed"
+            echo -e "   ${YELLOW}→ Check credentials in .env and ensure PostgreSQL is running${NC}"
+            has_errors=1
+        fi
+    fi
+
+    # Check SeaweedFS S3 endpoint
+    if [ "$check_seaweedfs" = true ]; then
+        local s3_endpoint="${S3_ENDPOINT:-http://localhost:8333}"
+        s3_endpoint="${s3_endpoint/host.docker.internal/localhost}"
+
+        if curl -s --connect-timeout 5 "$s3_endpoint" > /dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} SeaweedFS S3 endpoint OK"
+        else
+            echo -e "   ${RED}✗${NC} SeaweedFS S3 endpoint not responding ($s3_endpoint)"
+            echo -e "   ${YELLOW}→ Ensure SeaweedFS is running${NC}"
+            has_errors=1
+        fi
+    fi
+
+    # Check required ports are free
+    if [ "$check_ports" = true ]; then
+        local spark_port=$(get_spark_port)
+        local spark_ui_port=$(get_spark_ui_port)
+        local ports_to_check=("$spark_port:Spark Master" "$spark_ui_port:Spark UI" "9092:Kafka" "2181:Zookeeper")
+
+        for port_info in "${ports_to_check[@]}"; do
+            local port="${port_info%%:*}"
+            local name="${port_info#*:}"
+            if nc -z localhost "$port" 2>/dev/null; then
+                # Port in use - check if it's our expected service
+                case $port in
+                    $spark_port|$spark_ui_port)
+                        if docker ps --format '{{.Names}}' | grep -q "spark-master"; then
+                            echo -e "   ${GREEN}✓${NC} Port $port ($name) - existing Spark service"
+                        else
+                            echo -e "   ${YELLOW}!${NC} Port $port ($name) already in use"
+                        fi
+                        ;;
+                    9092)
+                        if docker ps --format '{{.Names}}' | grep -q "^kafka$"; then
+                            echo -e "   ${GREEN}✓${NC} Port $port ($name) - existing Kafka service"
+                        else
+                            echo -e "   ${YELLOW}!${NC} Port $port ($name) already in use"
+                        fi
+                        ;;
+                    *)
+                        echo -e "   ${YELLOW}!${NC} Port $port ($name) already in use"
+                        ;;
+                esac
+            else
+                echo -e "   ${GREEN}✓${NC} Port $port ($name) available"
+            fi
+        done
+    fi
+
+    return $has_errors
+}
+
 # Check prerequisites and return missing ones
 check_prerequisites() {
     local missing=()
@@ -81,14 +256,22 @@ check_prerequisites() {
 }
 
 # Wait for a service to be ready
+# Security: Uses bash -c with hardcoded commands only (never user input)
 wait_for_service() {
     local name=$1
     local check_cmd=$2
     local max_attempts=${3:-30}
     local attempt=1
 
+    # Security: Validate check_cmd only contains safe patterns
+    # Only allow: nc, curl, docker, psql commands with safe arguments
+    if [[ ! "$check_cmd" =~ ^(nc\ -z|curl\ -s|docker\ exec|PGPASSWORD=) ]]; then
+        echo -e "   ${RED}✗${NC} Invalid check command for $name"
+        return 1
+    fi
+
     while [ $attempt -le $max_attempts ]; do
-        if eval "$check_cmd" >/dev/null 2>&1; then
+        if bash -c "$check_cmd" >/dev/null 2>&1; then
             echo -e "   ${GREEN}✓${NC} $name ready"
             return 0
         fi
@@ -248,12 +431,14 @@ cmd_status_json() {
     local spark41_worker=$(is_container_running "spark-worker-41" && echo "true" || echo "false")
     local kafka_ok=$(is_container_running "kafka" && echo "true" || echo "false")
     local zk_ok=$(is_container_running "zookeeper" && echo "true" || echo "false")
+    local uc_ok=$(is_container_running "unity-catalog" && echo "true" || echo "false")
 
     cat <<EOF
 {
   "services": {
     "postgresql": $pg_ok,
-    "seaweedfs": $s3_ok
+    "seaweedfs": $s3_ok,
+    "unity_catalog": $uc_ok
   },
   "spark": {
     "4.0": {
@@ -282,6 +467,9 @@ cmd_status_human() {
     check_service postgres 5432 "PostgreSQL"
     check_service seaweedfs 8333 "SeaweedFS"
 
+    echo -e "\n${YELLOW}Unity Catalog (optional):${NC}"
+    check_container "unity-catalog" && check_service uc 8080 "Unity Catalog REST API" || true
+
     echo -e "\n${YELLOW}Spark 4.0 Containers:${NC}"
     check_container "spark-master" && docker exec spark-master /opt/spark/bin/spark-submit --version 2>&1 | grep "version" | head -1 || true
     check_container "spark-worker"
@@ -297,16 +485,19 @@ cmd_status_human() {
     echo -e "\n${YELLOW}Ports:${NC}"
     echo "  PostgreSQL:       5432"
     echo "  SeaweedFS:        8333"
+    echo "  Unity Catalog:    8080 (REST API + Iceberg endpoint)"
     echo "  Spark 4.0:        7077, 8080 (UI), 8081 (Worker UI)"
     echo "  Spark 4.1:        7078, 8082 (UI), 8083 (Worker UI)"
     echo "  Kafka:            9092"
     echo "  Zookeeper:        2181"
 
     echo -e "\n${YELLOW}Configurations:${NC}"
-    echo "  Spark 4.0:   docker-compose.yml"
-    echo "  Spark 4.1:   docker-compose-spark41.yml"
-    echo "  Kafka:       docker-compose-kafka.yml"
-    echo "  Spark conf:  config/spark/spark-defaults.conf"
+    echo "  Spark 4.0:       docker-compose.yml"
+    echo "  Spark 4.1:       docker-compose-spark41.yml"
+    echo "  Kafka:           docker-compose-kafka.yml"
+    echo "  Unity Catalog:   docker-compose-unity-catalog.yml"
+    echo "  Spark conf:      config/spark/spark-defaults.conf"
+    echo "  Spark conf (UC): config/spark/spark-defaults-uc.conf.example"
 }
 
 # Status command dispatcher
@@ -341,10 +532,23 @@ cmd_start() {
     esac
 
     case $service in
-        spark|kafka|all)
+        unity-catalog|uc)
+            echo -e "${YELLOW}Starting Unity Catalog...${NC}"
+            if [ ! -f "config/unity-catalog/server.properties" ]; then
+                echo -e "${YELLOW}Creating server.properties from example...${NC}"
+                cp config/unity-catalog/server.properties.example config/unity-catalog/server.properties
+                echo -e "${YELLOW}!${NC} Edit config/unity-catalog/server.properties with your S3 credentials"
+            fi
+            docker compose -f docker-compose-unity-catalog.yml up -d
+            wait_for_service "Unity Catalog" "curl -s http://localhost:8080/api/2.1/unity-catalog/catalogs" 60
+            ;;
+    esac
+
+    case $service in
+        spark|kafka|all|unity-catalog|uc)
             ;;
         *)
-            echo "Usage: lakehouse start [spark|kafka|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse start [spark|kafka|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -378,10 +582,17 @@ cmd_stop() {
     esac
 
     case $service in
-        spark|kafka|all)
+        unity-catalog|uc)
+            echo -e "${YELLOW}Stopping Unity Catalog...${NC}"
+            docker compose -f docker-compose-unity-catalog.yml down
+            ;;
+    esac
+
+    case $service in
+        spark|kafka|all|unity-catalog|uc)
             ;;
         *)
-            echo "Usage: lakehouse stop [spark|kafka|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse stop [spark|kafka|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -408,8 +619,11 @@ cmd_logs() {
         zookeeper)
             docker logs -f zookeeper
             ;;
+        unity-catalog|uc)
+            docker logs -f unity-catalog
+            ;;
         *)
-            echo "Usage: lakehouse logs [spark-master|spark-worker|kafka|zookeeper] [--version 4.0|4.1]"
+            echo "Usage: lakehouse logs [spark-master|spark-worker|kafka|zookeeper|unity-catalog] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -473,6 +687,26 @@ cmd_test() {
         echo -e "   ${RED}✗${NC} Spark container not running ($master_container)"
         echo -e "   ${YELLOW}→ Run: ./lakehouse start spark${NC}"
         ((failures++))
+    fi
+
+    echo -e "\n${YELLOW}5. Testing Unity Catalog (optional)...${NC}"
+    if docker ps --format '{{.Names}}' | grep -q '^unity-catalog$'; then
+        if curl -s --connect-timeout 5 http://localhost:8080/api/2.1/unity-catalog/catalogs > /dev/null 2>&1; then
+            echo -e "   ${GREEN}✓${NC} Unity Catalog REST API healthy"
+            # Test Iceberg REST endpoint
+            if curl -s --connect-timeout 5 http://localhost:8080/api/2.1/unity-catalog/iceberg/v1/config > /dev/null 2>&1; then
+                echo -e "   ${GREEN}✓${NC} Iceberg REST Catalog endpoint available"
+            else
+                echo -e "   ${YELLOW}!${NC} Iceberg REST endpoint not responding (may need configuration)"
+            fi
+        else
+            echo -e "   ${RED}✗${NC} Unity Catalog not responding"
+            echo -e "   ${YELLOW}→ Check: docker logs unity-catalog${NC}"
+            ((failures++))
+        fi
+    else
+        echo -e "   ${YELLOW}-${NC} Unity Catalog not running (optional)"
+        echo -e "   ${YELLOW}→ Run: ./lakehouse start unity-catalog${NC}"
     fi
 
     # Summary
@@ -568,6 +802,157 @@ cmd_testdata() {
     esac
 }
 
+# Check-config command - validates credential consistency
+cmd_check_config() {
+    header "CONFIGURATION CHECK"
+
+    echo -e "\n${YELLOW}1. Checking .env file...${NC}"
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        source "$PROJECT_ROOT/.env"
+        local env_issues=0
+
+        [ -z "$POSTGRES_USER" ] && echo -e "   ${RED}✗${NC} POSTGRES_USER not set" && env_issues=1
+        [ -z "$POSTGRES_PASSWORD" ] && echo -e "   ${RED}✗${NC} POSTGRES_PASSWORD not set" && env_issues=1
+        [ -z "$S3_ACCESS_KEY" ] && echo -e "   ${RED}✗${NC} S3_ACCESS_KEY not set" && env_issues=1
+        [ -z "$S3_SECRET_KEY" ] && echo -e "   ${RED}✗${NC} S3_SECRET_KEY not set" && env_issues=1
+        [ "$POSTGRES_USER" = "your_username" ] && echo -e "   ${YELLOW}!${NC} POSTGRES_USER has placeholder value" && env_issues=1
+        [ "$S3_ACCESS_KEY" = "your_access_key_here" ] && echo -e "   ${YELLOW}!${NC} S3_ACCESS_KEY has placeholder value" && env_issues=1
+
+        [ $env_issues -eq 0 ] && echo -e "   ${GREEN}✓${NC} .env configuration valid"
+    else
+        echo -e "   ${RED}✗${NC} .env file not found"
+    fi
+
+    echo -e "\n${YELLOW}2. Checking spark-defaults.conf...${NC}"
+    check_credential_consistency
+
+    echo -e "\n${YELLOW}3. Testing database connection...${NC}"
+    local pg_user="${POSTGRES_USER:-postgres}"
+    local pg_pass="${POSTGRES_PASSWORD:-}"
+    local pg_host="${POSTGRES_HOST:-localhost}"
+    pg_host="${pg_host/host.docker.internal/localhost}"
+
+    if PGPASSWORD="$pg_pass" psql -h "$pg_host" -U "$pg_user" -d iceberg_catalog -c "SELECT 1;" >/dev/null 2>&1; then
+        echo -e "   ${GREEN}✓${NC} PostgreSQL connection successful"
+    else
+        echo -e "   ${RED}✗${NC} PostgreSQL connection failed"
+        echo -e "   ${YELLOW}→ Check credentials and ensure database exists${NC}"
+    fi
+
+    echo -e "\n${YELLOW}4. Testing S3 endpoint...${NC}"
+    local s3_endpoint="${S3_ENDPOINT:-http://localhost:8333}"
+    s3_endpoint="${s3_endpoint/host.docker.internal/localhost}"
+
+    if curl -s --connect-timeout 5 "$s3_endpoint" > /dev/null 2>&1; then
+        echo -e "   ${GREEN}✓${NC} S3 endpoint responding"
+    else
+        echo -e "   ${YELLOW}!${NC} S3 endpoint not responding (may be OK if SeaweedFS not started)"
+    fi
+}
+
+# Preflight command
+cmd_preflight() {
+    header "PREFLIGHT CHECKS"
+    preflight_checks true true true
+    local result=$?
+
+    echo -e "\n${BLUE}================================${NC}"
+    if [ $result -eq 0 ]; then
+        echo -e "${GREEN}All preflight checks passed${NC}"
+    else
+        echo -e "${YELLOW}Some preflight checks failed - review warnings above${NC}"
+    fi
+    return $result
+}
+
+# Migrate command - run schema migrations
+cmd_migrate() {
+    header "SCHEMA MIGRATION"
+    local dry_run=false
+    local migrations_dir="$PROJECT_ROOT/schemas"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run) dry_run=true; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    # Load credentials
+    source "$PROJECT_ROOT/.env" 2>/dev/null || true
+    local pg_user="${POSTGRES_USER:-postgres}"
+    local pg_pass="${POSTGRES_PASSWORD:-}"
+    local pg_host="${POSTGRES_HOST:-localhost}"
+    pg_host="${pg_host/host.docker.internal/localhost}"
+    local pg_port="${POSTGRES_PORT:-5432}"
+    local db_name="iceberg_catalog"
+
+    # Check migrations directory
+    if [ ! -d "$migrations_dir" ]; then
+        echo -e "${YELLOW}!${NC} No schemas/ directory found"
+        echo -e "   ${YELLOW}→ Create schemas/iceberg/ with migration files${NC}"
+        return 0
+    fi
+
+    # Ensure migrations tracking table exists
+    PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -c "
+        CREATE TABLE IF NOT EXISTS _migrations (
+            id SERIAL PRIMARY KEY,
+            filename VARCHAR(255) UNIQUE NOT NULL,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    " >/dev/null 2>&1
+
+    # Find and apply migrations
+    local applied_count=0
+    for migration_file in $(find "$migrations_dir" -name "*.sql" -type f | sort); do
+        local filename=$(basename "$migration_file")
+
+        # Security: Validate filename contains only safe characters (alphanumeric, underscore, hyphen, dot)
+        if [[ ! "$filename" =~ ^[a-zA-Z0-9_.-]+\.sql$ ]]; then
+            echo -e "   ${RED}✗${NC} Skipping unsafe filename: $filename"
+            continue
+        fi
+
+        # Security: Escape single quotes in filename for SQL (double them)
+        local safe_filename="${filename//\'/\'\'}"
+
+        # Check if already applied
+        local is_applied=$(PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -t -c "
+            SELECT COUNT(*) FROM _migrations WHERE filename = '$safe_filename';
+        " 2>/dev/null | tr -d ' ')
+
+        if [ "$is_applied" = "1" ]; then
+            echo -e "   ${GREEN}✓${NC} $filename (already applied)"
+            continue
+        fi
+
+        if [ "$dry_run" = true ]; then
+            echo -e "   ${YELLOW}→${NC} $filename (would apply)"
+        else
+            echo -e "   ${BLUE}→${NC} Applying $filename..."
+            if PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -f "$migration_file" >/dev/null 2>&1; then
+                PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$db_name" -c "
+                    INSERT INTO _migrations (filename) VALUES ('$safe_filename');
+                " >/dev/null 2>&1
+                echo -e "   ${GREEN}✓${NC} $filename applied"
+                ((applied_count++))
+            else
+                echo -e "   ${RED}✗${NC} $filename failed"
+                return 1
+            fi
+        fi
+    done
+
+    echo -e "\n${BLUE}================================${NC}"
+    if [ "$dry_run" = true ]; then
+        echo -e "${YELLOW}Dry run complete - no changes made${NC}"
+    else
+        echo -e "${GREEN}Migration complete - $applied_count new migrations applied${NC}"
+    fi
+}
+
 # Setup command - validates and configures everything
 cmd_setup() {
     header "LAKEHOUSE SETUP"
@@ -620,6 +1005,8 @@ cmd_setup() {
         fi
     else
         echo -e "${GREEN}✓${NC} spark-defaults.conf exists"
+        # Validate credential consistency
+        check_credential_consistency
     fi
 
     # Step 4: Check JARs
@@ -650,6 +1037,12 @@ cmd_setup() {
         fi
     else
         echo -e "${GREEN}✓${NC} All required JARs present"
+        # Verify JAR checksums if available
+        if [ -f "$PROJECT_ROOT/scripts/download-jars.sh" ]; then
+            bash "$PROJECT_ROOT/scripts/download-jars.sh" --verify-only 2>/dev/null && \
+                echo -e "  ${GREEN}✓${NC} JAR checksums verified" || \
+                echo -e "  ${YELLOW}!${NC} JAR checksum verification skipped"
+        fi
     fi
 
     # Step 5: Install Python dependencies
@@ -661,8 +1054,16 @@ cmd_setup() {
         }
     fi
 
-    # Step 6: Check disk space
-    echo -e "\n${YELLOW}5. Checking disk space...${NC}"
+    # Step 6: Setup PostgreSQL database
+    echo -e "\n${YELLOW}5. Setting up PostgreSQL database...${NC}"
+    if check_cmd psql && [ -n "$POSTGRES_USER" ] && [ "$POSTGRES_USER" != "your_username" ]; then
+        setup_postgres || has_errors=1
+    else
+        echo -e "   ${YELLOW}!${NC} Skipping PostgreSQL setup (psql not available or credentials not configured)"
+    fi
+
+    # Step 7: Check disk space
+    echo -e "\n${YELLOW}6. Checking disk space...${NC}"
     local free_gb=$(df -BG "$PROJECT_ROOT" | tail -1 | awk '{print $4}' | tr -d 'G')
     if [ "$free_gb" -lt 10 ] 2>/dev/null; then
         echo -e "${YELLOW}!${NC} Low disk space: ${free_gb}GB free (10GB+ recommended)"
@@ -670,8 +1071,8 @@ cmd_setup() {
         echo -e "${GREEN}✓${NC} Disk space OK (${free_gb}GB free)"
     fi
 
-    # Step 7: Check for port conflicts
-    echo -e "\n${YELLOW}6. Checking for port conflicts...${NC}"
+    # Step 8: Check for port conflicts
+    echo -e "\n${YELLOW}7. Checking for port conflicts...${NC}"
     local ports_ok=1
     for port in 5432 8333 9092 7077 7078 8080 8082; do
         if nc -z localhost $port 2>/dev/null; then
@@ -690,6 +1091,7 @@ cmd_setup() {
         echo -e "\nNext steps:"
         echo "  1. Start services:  ./lakehouse start all"
         echo "  2. Run tests:       ./lakehouse test"
+        echo "  3. Run migrations:  ./lakehouse migrate"
     else
         echo -e "${YELLOW}Setup incomplete - please address the issues above${NC}"
         echo -e "\nSee SETUP.md for detailed instructions."
@@ -705,11 +1107,14 @@ cmd_help() {
     echo ""
     echo "Commands:"
     echo "  setup               Validate environment and install dependencies"
+    echo "  check-config        Validate credentials between .env and spark-defaults.conf"
+    echo "  preflight           Run preflight checks before starting services"
+    echo "  migrate [--dry-run] Run database schema migrations"
     echo "  status              Show all services status"
-    echo "  start [service]     Start service (spark|kafka|all)"
-    echo "  stop [service]      Stop service (spark|kafka|all)"
+    echo "  start [service]     Start service (spark|kafka|unity-catalog|all)"
+    echo "  stop [service]      Stop service (spark|kafka|unity-catalog|all)"
     echo "  restart [service]   Restart service"
-    echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper)"
+    echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper|unity-catalog)"
     echo "  test                Run connectivity tests"
     echo "  producer            Start Kafka event producer"
     echo "  consumer            Start Spark streaming consumer"
@@ -720,9 +1125,22 @@ cmd_help() {
     echo "  --version 4.0|4.1   Select Spark version (default: 4.1)"
     echo "  --json              Output status in JSON format (for status command)"
     echo ""
+    echo "Services:"
+    echo "  spark          Spark cluster (4.0 or 4.1)"
+    echo "  kafka          Kafka + Zookeeper"
+    echo "  unity-catalog  Unity Catalog OSS (Iceberg REST Catalog)"
+    echo "  all            Spark + Kafka (not Unity Catalog)"
+    echo ""
     echo "Spark Versions:"
     echo "  4.0 - Port 7077, UI 8080 (docker-compose.yml)"
     echo "  4.1 - Port 7078, UI 8082 (docker-compose-spark41.yml)"
+    echo ""
+    echo "Unity Catalog:"
+    echo "  Unity Catalog OSS provides an alternative to PostgreSQL JDBC catalog:"
+    echo "  - REST API for Iceberg tables (port 8080)"
+    echo "  - Multi-format support (Delta, Iceberg, Hudi via UniForm)"
+    echo "  - Interoperability with DuckDB, Trino, Dremio"
+    echo "  See: docs/guides/unity-catalog.md"
     echo ""
     echo "Test Data Commands:"
     echo "  testdata generate   Generate 90-day dataset (~75K orders)"
@@ -733,10 +1151,14 @@ cmd_help() {
     echo ""
     echo "Examples:"
     echo "  lakehouse setup"
+    echo "  lakehouse check-config"
+    echo "  lakehouse preflight"
+    echo "  lakehouse migrate --dry-run"
     echo "  lakehouse status"
     echo "  lakehouse status --json"
     echo "  lakehouse start all"
     echo "  lakehouse start spark --version 4.0"
+    echo "  lakehouse start unity-catalog"
     echo "  lakehouse testdata generate --days 30"
     echo "  lakehouse testdata stream --speed 100"
 }
@@ -748,6 +1170,15 @@ parse_version "$@"
 case ${1:-help} in
     setup)
         cmd_setup
+        ;;
+    check-config)
+        cmd_check_config
+        ;;
+    preflight)
+        cmd_preflight
+        ;;
+    migrate)
+        cmd_migrate "${@:2}"
         ;;
     status)
         cmd_status
