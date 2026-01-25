@@ -174,12 +174,12 @@ class TestJARDownloadScript:
 
     def test_download_script_exists(self, project_root):
         """Verify download-jars.sh exists."""
-        script_path = os.path.join(project_root, "scripts", "download-jars.sh")
+        script_path = os.path.join(project_root, "scripts", "tools", "download-jars.sh")
         assert os.path.exists(script_path), "download-jars.sh not found"
 
     def test_download_script_syntax(self, project_root):
         """Verify download-jars.sh has valid bash syntax."""
-        script_path = os.path.join(project_root, "scripts", "download-jars.sh")
+        script_path = os.path.join(project_root, "scripts", "tools", "download-jars.sh")
         result = subprocess.run(
             ["bash", "-n", script_path],
             capture_output=True,
@@ -189,7 +189,7 @@ class TestJARDownloadScript:
 
     def test_download_script_has_verify_flag(self, project_root):
         """Verify download-jars.sh supports --verify-only flag."""
-        script_path = os.path.join(project_root, "scripts", "download-jars.sh")
+        script_path = os.path.join(project_root, "scripts", "tools", "download-jars.sh")
 
         with open(script_path, "r") as f:
             content = f.read()
@@ -198,7 +198,7 @@ class TestJARDownloadScript:
 
     def test_download_script_has_retry_logic(self, project_root):
         """Verify download-jars.sh has retry logic."""
-        script_path = os.path.join(project_root, "scripts", "download-jars.sh")
+        script_path = os.path.join(project_root, "scripts", "tools", "download-jars.sh")
 
         with open(script_path, "r") as f:
             content = f.read()
