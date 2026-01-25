@@ -69,12 +69,12 @@ Required:
 # Submit to Spark 4.1
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
   --master spark://localhost:7078 \
-  /scripts/01-basics.py
+  /scripts/quickstarts/01-basics.py
 
 # Submit to Spark 4.0
 docker exec spark-master /opt/spark/bin/spark-submit \
   --master spark://localhost:7077 \
-  /scripts/01-basics.py
+  /scripts/quickstarts/01-basics.py
 ```
 
 ### Local spark-submit
@@ -85,7 +85,7 @@ Requires Java 21 (Spark 4.1) or Java 17 (Spark 4.0):
 spark-submit \
   --master spark://localhost:7078 \
   --jars jars/iceberg-spark-runtime-4.0_2.13-1.10.0.jar \
-  scripts/01-basics.py
+  scripts/quickstarts/01-basics.py
 ```
 
 ## Multi-Version Testing
@@ -101,8 +101,8 @@ Run Spark 4.0 and 4.1 simultaneously:
 ./lakehouse status
 
 # Submit to specific version
-docker exec spark-master /opt/spark/bin/spark-submit /scripts/test.py      # 4.0
-docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/test.py   # 4.1
+docker exec spark-master /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py      # 4.0
+docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py   # 4.1
 ```
 
 ## Resource Management

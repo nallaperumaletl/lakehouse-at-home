@@ -26,13 +26,13 @@ docker exec spark-master-41 ls -la my_pipeline/
 docker exec spark-master-41 cat my_pipeline/spark-pipeline.yml
 
 # 4. View our demo pipeline code
-cat scripts/demo/transformations/sales_pipeline.py
+cat scripts/demos/transformations/sales_pipeline.py
 
 # 5. Dry-run to validate
-docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline.yml
+docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline.yml
 
 # 6. Run the pipeline
-docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/demo/spark-pipeline.yml
+docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/demos/spark-pipeline.yml
 ```
 
 ### Voiceover Script
@@ -73,7 +73,7 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/d
 
 **[PART 4: Show sales_pipeline.py]**
 
-*Run: `cat scripts/demo/transformations/sales_pipeline.py`*
+*Run: `cat scripts/demos/transformations/sales_pipeline.py`*
 
 > "Now here's where it gets interesting. This is our actual pipeline code. Notice we're using decorators from pyspark.pipelines."
 >
@@ -87,7 +87,7 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/d
 
 **[PART 5: Run dry-run]**
 
-*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline.yml`*
+*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline.yml`*
 
 > "Before we run anything, we validate with a dry-run. This is one of the most powerful features. The dry-run parses all our transformation code, resolves every table reference, validates the dependency graph, and checks for errors - all without processing a single byte of data."
 >
@@ -97,7 +97,7 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/d
 
 **[PART 6: Run the pipeline]**
 
-*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/demo/spark-pipeline.yml`*
+*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/demos/spark-pipeline.yml`*
 
 > "Now we execute for real. The framework determines the optimal execution order, manages all the streaming and batch processing, handles checkpoints, and monitors for failures."
 >
@@ -117,16 +117,16 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines run --spec /scripts/d
 
 ```bash
 # 1. Show the broken pipeline code
-cat scripts/demo/transformations/sales_pipeline_broken.py
+cat scripts/demos/transformations/sales_pipeline_broken.py
 
 # 2. Try dry-run (will fail)
-docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml
+docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline-broken.yml
 
 # 3. Show the fix
 echo "Fix: Change 'orderz' to 'orders' on line 44"
 
 # 4. Run dry-run on fixed version
-docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline.yml
+docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline.yml
 ```
 
 ### Voiceover Script
@@ -141,7 +141,7 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scrip
 
 **[PART 1: Show the broken pipeline]**
 
-*Run: `cat scripts/demo/transformations/sales_pipeline_broken.py`*
+*Run: `cat scripts/demos/transformations/sales_pipeline_broken.py`*
 
 > "Here's a pipeline that looks almost identical to our working version. But there's a subtle bug hiding in here. Look at line 44 - someone typed 'orderz' with a Z instead of 'orders'. It's the kind of typo that happens all the time, especially when you're working quickly or copying code."
 >
@@ -153,7 +153,7 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scrip
 
 **[PART 2: Run dry-run on broken version]**
 
-*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml`*
+*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline-broken.yml`*
 
 > "Watch what happens when we run a dry-run on this broken pipeline."
 >
@@ -177,7 +177,7 @@ docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scrip
 
 **[PART 4: Run dry-run on fixed version]**
 
-*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline.yml`*
+*Run: `docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline.yml`*
 
 > "Now let's dry-run the corrected version."
 >
@@ -217,8 +217,8 @@ For a guided walkthrough with pauses:
 
 ```bash
 # Full demo with init, dry-run, run
-./scripts/demo/run_demo.sh
+./scripts/demos/run_demo.sh
 
 # Error catching demo
-./scripts/demo/run_demo_fix_error.sh
+./scripts/demos/run_demo_fix_error.sh
 ```

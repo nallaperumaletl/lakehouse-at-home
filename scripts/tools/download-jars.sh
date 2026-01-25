@@ -6,7 +6,7 @@
 set -e  # Exit on error
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-JARS_DIR="${SCRIPT_DIR}/../jars"
+JARS_DIR="${SCRIPT_DIR}/../../jars"
 mkdir -p "${JARS_DIR}"
 JARS_DIR="$(cd "${JARS_DIR}" && pwd)"
 

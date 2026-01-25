@@ -14,20 +14,20 @@ This guide covers building data pipelines with the Lakehouse Stack, comparing im
 docker exec spark-master /opt/spark/bin/spark-submit \
     --master spark://spark-master:7077 \
     --conf spark.sql.iceberg.vectorization.enabled=false \
-    /scripts/pipeline_spark40.py
+    /scripts/pipelines/pipeline_spark40.py
 
 # Run declarative pipeline (Spark 4.1)
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
-    /scripts/pipeline_spark41.py
+    /scripts/pipelines/pipeline_spark41.py
 ```
 
 ## Pipeline Scripts
 
 | Script | Approach | Description |
 |--------|----------|-------------|
-| `scripts/pipeline_spark40.py` | Imperative | Traditional PySpark with explicit function calls |
-| `scripts/pipeline_spark41.py` | Declarative | SDP-style decorators with auto dependency resolution |
-| `scripts/pipeline_sdp.py` | Production SDP | For use with `spark-pipelines` CLI |
+| `scripts/pipelines/pipeline_spark40.py` | Imperative | Traditional PySpark with explicit function calls |
+| `scripts/pipelines/pipeline_spark41.py` | Declarative | SDP-style decorators with auto dependency resolution |
+| `scripts/pipelines/pipeline_sdp.py` | Production SDP | For use with `spark-pipelines` CLI |
 
 ## Workshop Notebooks
 
@@ -127,15 +127,15 @@ pipeline.run()
 
 ```bash
 # Validate without running
-spark-pipelines dry-run --spec scripts/spark-pipeline.yml
+spark-pipelines dry-run --spec scripts/pipelines/spark-pipeline.yml
 
 # Execute pipeline
-spark-pipelines run --spec scripts/spark-pipeline.yml
+spark-pipelines run --spec scripts/pipelines/spark-pipeline.yml
 ```
 
 ### Configuration File
 
-`scripts/spark-pipeline.yml`:
+`scripts/pipelines/spark-pipeline.yml`:
 
 ```yaml
 name: lakehouse_pipeline
@@ -174,7 +174,7 @@ Large datasets may cause OOM with Arrow vectorization:
 docker exec spark-master /opt/spark/bin/spark-submit \
     --master spark://spark-master:7077 \
     --conf spark.sql.iceberg.vectorization.enabled=false \
-    /scripts/pipeline_spark40.py
+    /scripts/pipelines/pipeline_spark40.py
 ```
 
 ### Table Already Exists

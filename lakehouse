@@ -509,6 +509,109 @@ cmd_status() {
     fi
 }
 
+# Check if port is available or used by expected container
+# Returns: 0 = available or used by expected service, 1 = blocked by something else
+check_port_available() {
+    local port=$1
+    local expected_container=$2
+
+    if ! nc -z localhost "$port" 2>/dev/null; then
+        # Port is free
+        return 0
+    fi
+
+    # Port is in use - check if it's our expected container
+    if [ -n "$expected_container" ]; then
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${expected_container}$"; then
+            # Our container is using it - that's fine
+            return 0
+        fi
+    fi
+
+    # Port is blocked by something else
+    return 1
+}
+
+# Pre-start port checks for a service
+check_ports_for_service() {
+    local service=$1
+    local has_conflicts=0
+    local spark_port=$(get_spark_port)
+    local spark_ui_port=$(get_spark_ui_port)
+    local master_container=$(get_spark_master_container)
+    local worker_container=$(get_spark_worker_container)
+
+    echo -e "${YELLOW}Checking port availability...${NC}"
+
+    case $service in
+        spark|all)
+            if ! check_port_available "$spark_port" "$master_container"; then
+                echo -e "  ${RED}✗${NC} Port $spark_port (Spark Master) blocked by another process"
+                has_conflicts=1
+            else
+                echo -e "  ${GREEN}✓${NC} Port $spark_port (Spark Master) available"
+            fi
+
+            if ! check_port_available "$spark_ui_port" "$master_container"; then
+                echo -e "  ${RED}✗${NC} Port $spark_ui_port (Spark UI) blocked by another process"
+                has_conflicts=1
+            else
+                echo -e "  ${GREEN}✓${NC} Port $spark_ui_port (Spark UI) available"
+            fi
+
+            local worker_ui_port=$((spark_ui_port + 1))
+            if ! check_port_available "$worker_ui_port" "$worker_container"; then
+                echo -e "  ${YELLOW}!${NC} Port $worker_ui_port (Spark Worker UI) in use"
+            fi
+            ;;
+    esac
+
+    case $service in
+        kafka|all)
+            if ! check_port_available 9092 "kafka"; then
+                echo -e "  ${RED}✗${NC} Port 9092 (Kafka) blocked by another process"
+                has_conflicts=1
+            else
+                echo -e "  ${GREEN}✓${NC} Port 9092 (Kafka) available"
+            fi
+
+            if ! check_port_available 2181 "zookeeper"; then
+                echo -e "  ${RED}✗${NC} Port 2181 (Zookeeper) blocked by another process"
+                has_conflicts=1
+            else
+                echo -e "  ${GREEN}✓${NC} Port 2181 (Zookeeper) available"
+            fi
+            ;;
+    esac
+
+    case $service in
+        unity-catalog|uc)
+            if ! check_port_available 8080 "unity-catalog"; then
+                # Special case: 8080 might be Spark 4.0 UI
+                if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^spark-master$"; then
+                    echo -e "  ${YELLOW}!${NC} Port 8080 in use by Spark 4.0 UI - Unity Catalog will conflict"
+                    echo -e "      ${YELLOW}→ Stop Spark 4.0 or use Spark 4.1 (port 8082) instead${NC}"
+                    has_conflicts=1
+                else
+                    echo -e "  ${RED}✗${NC} Port 8080 (Unity Catalog) blocked by another process"
+                    has_conflicts=1
+                fi
+            else
+                echo -e "  ${GREEN}✓${NC} Port 8080 (Unity Catalog) available"
+            fi
+            ;;
+    esac
+
+    if [ $has_conflicts -eq 1 ]; then
+        echo -e "\n${RED}Port conflicts detected.${NC}"
+        echo -e "${YELLOW}→ Stop conflicting services or use different ports${NC}"
+        echo -e "${YELLOW}→ Run './lakehouse status' to see what's running${NC}"
+        return 1
+    fi
+
+    return 0
+}
+
 # Start command
 cmd_start() {
     header "STARTING SERVICES"
@@ -516,6 +619,13 @@ cmd_start() {
     local service=$1
     local compose_file=$(get_spark_compose)
     local spark_port=$(get_spark_port)
+
+    # Check port availability before starting
+    if ! check_ports_for_service "$service"; then
+        echo -e "\n${RED}Aborting start due to port conflicts.${NC}"
+        return 1
+    fi
+    echo ""
 
     case $service in
         spark|all)
@@ -725,7 +835,7 @@ cmd_test() {
 # Producer command
 cmd_producer() {
     header "STARTING KAFKA PRODUCER"
-    poetry run python scripts/kafka-producer.py
+    poetry run python scripts/tools/kafka-producer.py
 }
 
 # Consumer command
@@ -744,7 +854,7 @@ cmd_consumer() {
     docker exec "$master_container" /opt/spark/bin/spark-submit \
         --packages "$kafka_package" \
         --conf spark.jars.ivy=/opt/spark/.ivy2 \
-        /scripts/test-kafka.py
+        /scripts/connectivity/test-kafka.py
 }
 
 # Testdata commands
@@ -1029,8 +1139,8 @@ cmd_setup() {
 
     if [ $missing_jars -eq 1 ]; then
         echo -e "\n${YELLOW}Downloading missing JARs...${NC}"
-        if [ -f "$PROJECT_ROOT/scripts/download-jars.sh" ]; then
-            bash "$PROJECT_ROOT/scripts/download-jars.sh"
+        if [ -f "$PROJECT_ROOT/scripts/tools/download-jars.sh" ]; then
+            bash "$PROJECT_ROOT/scripts/tools/download-jars.sh"
         else
             echo -e "${RED}✗${NC} download-jars.sh not found"
             has_errors=1
@@ -1038,8 +1148,8 @@ cmd_setup() {
     else
         echo -e "${GREEN}✓${NC} All required JARs present"
         # Verify JAR checksums if available
-        if [ -f "$PROJECT_ROOT/scripts/download-jars.sh" ]; then
-            bash "$PROJECT_ROOT/scripts/download-jars.sh" --verify-only 2>/dev/null && \
+        if [ -f "$PROJECT_ROOT/scripts/tools/download-jars.sh" ]; then
+            bash "$PROJECT_ROOT/scripts/tools/download-jars.sh" --verify-only 2>/dev/null && \
                 echo -e "  ${GREEN}✓${NC} JAR checksums verified" || \
                 echo -e "  ${YELLOW}!${NC} JAR checksum verification skipped"
         fi

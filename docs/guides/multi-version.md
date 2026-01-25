@@ -122,11 +122,11 @@ print(spark.version)  # "4.0.1" or "4.1.0"
 ```bash
 # Run on 4.0
 docker exec spark-master /opt/spark/bin/spark-submit \
-  /scripts/test-job.py > results-4.0.txt 2>&1
+  /scripts/quickstarts/01-basics.py > results-4.0.txt 2>&1
 
 # Run on 4.1
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
-  /scripts/test-job.py > results-4.1.txt 2>&1
+  /scripts/quickstarts/01-basics.py > results-4.1.txt 2>&1
 
 # Compare results
 diff results-4.0.txt results-4.1.txt

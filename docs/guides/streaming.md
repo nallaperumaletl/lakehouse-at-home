@@ -104,7 +104,7 @@ The built-in consumer shows live aggregations:
 
 ### Custom Streaming Jobs
 
-Example: `scripts/04-kafka-streaming.py`
+Example: `scripts/quickstarts/04-kafka-streaming.py`
 
 ```python
 from pyspark.sql import SparkSession
@@ -153,7 +153,7 @@ Run with:
 ```bash
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.0 \
-  /scripts/04-kafka-streaming.py
+  /scripts/quickstarts/04-kafka-streaming.py
 ```
 
 ### Write to Iceberg

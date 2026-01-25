@@ -38,7 +38,7 @@ banner "Catching Dependency Errors with Dry-Run"
 echo "Let's look at a pipeline with a bug:"
 pause
 
-run_cmd "cat scripts/demo/transformations/sales_pipeline_broken.py | head -50"
+run_cmd "cat scripts/demos/transformations/sales_pipeline_broken.py | head -50"
 
 echo ""
 echo -e "${YELLOW}Notice line 44: spark.table(\"iceberg.bronze.orderz\") - typo!${NC}"
@@ -47,8 +47,8 @@ pause
 echo "Let's run a dry-run to validate:"
 pause
 
-echo -e "${YELLOW}$ docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml${NC}"
-docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline-broken.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J' || true
+echo -e "${YELLOW}$ docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline-broken.yml${NC}"
+docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline-broken.yml 2>&1 | grep -v 'WARN\|WARNING\|SLF4J' || true
 
 echo ""
 echo -e "${RED}ERROR CAUGHT! The dry-run found the typo: 'orderz' should be 'orders'${NC}"
@@ -69,7 +69,7 @@ pause
 echo "Let's use the fixed version and dry-run again:"
 pause
 
-run_cmd "docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demo/spark-pipeline.yml 2>&1 | grep -E '(Loading|Found|Importing|Starting|COMPLETED)'"
+run_cmd "docker exec spark-master-41 /opt/spark/bin/spark-pipelines dry-run --spec /scripts/demos/spark-pipeline.yml 2>&1 | grep -E '(Loading|Found|Importing|Starting|COMPLETED)'"
 
 echo ""
 echo -e "${GREEN}Dry-run passed! Now we can safely run the pipeline.${NC}"

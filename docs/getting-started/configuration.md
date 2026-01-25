@@ -93,6 +93,17 @@ Key environment variables passed to containers:
 - JARs mounted from `./jars/`
 - Scripts mounted from `./scripts/`
 
+#### Scripts Directory Structure
+
+```
+scripts/
+├── examples/        # Learning tutorials (01-04)
+├── quickstarts/     # Tutorials and demos
+├── tools/           # Utilities (download-jars.sh, kafka-producer.py)
+├── connectivity/    # Integration tests (test-iceberg.py, test-kafka.py)
+└── testdata/        # Test data generation module
+```
+
 ### Kafka (docker-compose-kafka.yml)
 
 Default configuration:

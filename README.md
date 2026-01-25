@@ -3,9 +3,9 @@
 A fully open-source, self-hostable data lakehouse for local development and testing of modern data workflows. Run production-grade infrastructure on your laptop with Apache Spark, Iceberg, and Kafka - no cloud account required. Includes a realistic data generation framework to test batch and streaming pipelines.
 
 [![CI](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml/badge.svg)](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/lisancao/lakehouse-at-home/branch/main/graph/badge.svg)](https://codecov.io/gh/lisancao/lakehouse-at-home)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/lisancao/lakehouse-at-home)](https://github.com/lisancao/lakehouse-at-home/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/lisancao/lakehouse-at-home)](https://github.com/lisancao/lakehouse-at-home/issues)
 [![Spark](https://img.shields.io/badge/Spark-4.0%20%7C%204.1-E25A1C?logo=apachespark&logoColor=white)](https://spark.apache.org/)
 [![Iceberg](https://img.shields.io/badge/Iceberg-1.10-blue)](https://iceberg.apache.org/)
 
@@ -122,6 +122,7 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | [Databricks Deployment](docs/deployment/databricks.md) | Managed Spark platform |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
 | [Security](SECURITY.md) | Security guidelines for contributors |
+| [AI Skills](https://github.com/lisancao/lakehouse-skills) | AI assistant references (SDP, etc.) |
 
 ## Architecture
 
@@ -230,7 +231,7 @@ poetry run pytest tests/integration/ -v               # Integration tests
 poetry run pytest -m security -v                      # Security tests
 
 # Multi-version Spark testing
-./scripts/test-spark-versions.sh -v 4.0 -v 4.1 -t all
+./scripts/connectivity/test-spark-versions.sh -v 4.0 -v 4.1 -t all
 ```
 
 ## Security

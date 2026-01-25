@@ -46,7 +46,7 @@ After Phase 0-1 merge:
 - Security infrastructure (`SECURITY.md`, `.pre-commit-config.yaml`, `tests/test_security.py`)
 - Enhanced CLI with preflight checks (`lakehouse`)
 - JAR download with retry logic (`scripts/download-jars.sh`)
-- Multi-version Spark testing (`scripts/test-spark-versions.sh`)
+- Multi-version Spark testing (`scripts/connectivity/test-spark-versions.sh`)
 - Schema migrations (`schemas/`)
 
 ### Pending in feature/unity-catalog-oss (PR #11)
@@ -54,7 +54,7 @@ After Phase 0-1 merge:
 - Unity Catalog OSS deployment (`docker-compose-unity-catalog.yml`)
 - Spark REST catalog configuration (`config/spark/spark-defaults-uc.conf.example`)
 - Unity Catalog guide (`docs/guides/unity-catalog.md`)
-- Demo script (`scripts/unity_catalog_demo.py`)
+- Demo script (`scripts/quickstarts/unity-catalog-demo.py`)
 - Integration tests (`tests/integration/test_unity_catalog.py` - 17 tests)
 
 ## Integration Plan
@@ -124,7 +124,7 @@ poetry run pytest tests/integration/ -v               # Integration only
 poetry run pytest -m security -v                      # Security only
 
 # Multi-version Spark tests
-./scripts/test-spark-versions.sh -v 4.1 -t all
+./scripts/connectivity/test-spark-versions.sh -v 4.1 -t all
 
 # Lint/format
 poetry run ruff check scripts/ tests/ --fix
