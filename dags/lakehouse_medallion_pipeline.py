@@ -65,7 +65,7 @@ with DAG(
         task_id="run_pipeline_spark41",
         bash_command="""
             docker exec spark-master-41 /opt/spark/bin/spark-submit \
-                /scripts/pipeline_spark41.py
+                /scripts/pipelines/pipeline_spark41.py
         """,
     )
 
@@ -74,7 +74,7 @@ with DAG(
         task_id="run_pipeline_spark40",
         bash_command="""
             docker exec spark-master /opt/spark/bin/spark-submit \
-                /scripts/pipeline_spark40.py
+                /scripts/pipelines/pipeline_spark40.py
         """,
     )
 
