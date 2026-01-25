@@ -1,6 +1,6 @@
 # Airflow Orchestration Guide
 
-Orchestrate Spark jobs, Kafka sensors, and Iceberg maintenance with Apache Airflow 2.8.x.
+Orchestrate Spark jobs, Kafka sensors, and Iceberg maintenance with Apache Airflow 3.x.
 
 ## Architecture
 
