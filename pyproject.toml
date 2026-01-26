@@ -64,10 +64,16 @@ exclude = [".venv", "jars", "notebooks"]
 
 [tool.coverage.run]
 branch = true
+source = ["scripts/testdata"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
     "*/.venv/*",
+    # Demo and quickstart scripts (run manually, not library code)
+    "scripts/quickstarts/*",
+    "scripts/demos/*",
+    "scripts/connectivity/*",
+    "scripts/pipelines/*",
 ]
 
 [tool.coverage.report]

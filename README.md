@@ -3,7 +3,6 @@
 A fully open-source, self-hostable data lakehouse for local development and testing of modern data workflows. Run production-grade infrastructure on your laptop with Apache Spark, Iceberg, and Kafka - no cloud account required. Includes a realistic data generation framework to test batch and streaming pipelines.
 
 [![CI](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml/badge.svg)](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/lisancao/lakehouse-at-home/branch/master/graph/badge.svg)](https://codecov.io/gh/lisancao/lakehouse-at-home)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/lisancao/lakehouse-at-home)](https://github.com/lisancao/lakehouse-at-home/stargazers)
 [![Spark](https://img.shields.io/badge/Spark-4.0%20%7C%204.1-E25A1C?logo=apachespark&logoColor=white)](https://spark.apache.org/)
@@ -150,18 +149,18 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 │                      │    │                                                       │
 │  Zookeeper (:2181)   │    │  Spark 4.0 (:7077, UI :8080)                         │
 │                      │    │  Spark 4.1 (:7078, UI :8082)                         │
-│  (direct to Spark,   │    └──────────────────────────┬────────────────────────────┘
-│   not via catalog)   │                               │
-└──────────────────────┘                               │ Iceberg API
-                                                       │
-┌──────────────────────┐                               │
-│  ORCHESTRATION       │                               │
-│                      │───────────────────────────────┤
-│  Airflow (:8085)     │  Schedules Spark jobs,        │
-│  └─ DAGs             │  Iceberg maintenance          │
-│  └─ Sensors          │                               │
-└──────────────────────┘                               │
-                                                       ▼
+│  (direct to Spark,   │    └───────────────────────────────────────────┬──────────┘
+│   not via catalog)   │                        ▲                       │
+└──────────────────────┘                        │                       │ Iceberg API
+                                                │ docker exec           │
+┌──────────────────────┐                        │ spark-submit          │
+│  ORCHESTRATION       │────────────────────────┘                       │
+│                      │                                                │
+│  Airflow (:8085)     │  (Airflow schedules Spark jobs;                │
+│  └─ DAGs             │   Spark talks to Iceberg)                      │
+│  └─ Sensors          │                                                │
+└──────────────────────┘                                                │
+                                                                        ▼
                             ┌───────────────────────────────────────────────────────┐
                             │                 CATALOG: Iceberg Metadata             │
                             │                                                       │
@@ -187,8 +186,9 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 **How It Works:**
 1. **Streaming** → Kafka feeds events directly to Spark (not via catalog)
 2. **Compute** → Spark transforms data through Bronze → Silver → Gold layers
-3. **Catalog** → PostgreSQL or Unity Catalog manages Iceberg table metadata
-4. **Storage** → SeaweedFS stores Parquet files accessed via Iceberg
+3. **Orchestration** → Airflow schedules Spark jobs via `docker exec spark-submit`
+4. **Catalog** → PostgreSQL or Unity Catalog manages Iceberg table metadata
+5. **Storage** → SeaweedFS stores Parquet files accessed via Iceberg
 
 **Catalog Options:**
 | Feature | PostgreSQL JDBC | Unity Catalog |
