@@ -16,7 +16,7 @@ Self-hostable data lakehouse: Spark 4.x + Iceberg 1.10 + Kafka 3.6 + PostgreSQL 
 | `docs/deployment/` | Local and AWS deployment |
 | `docs/architecture.md` | System design |
 | `docs/troubleshooting.md` | Common issues |
-| `docs/DEV_WORKFLOW.md` | Branch state and integration plan for agents |
+| `docs/DEV_WORKFLOW.md` | Development workflow: always work from develop, test locally |
 | `SECURITY.md` | Security guidelines for contributors |
 | `.claude/skills/` | AI assistant skill files (see below) |
 
@@ -226,11 +226,16 @@ docker logs airflow-webserver # Airflow logs
 
 ## For AI Agents
 
-See `docs/DEV_WORKFLOW.md` for:
-- Current branch state and relationships
-- Integration plan and phase status
-- Commands for branch analysis
-- Guidelines for feature work
+**Golden rule: Always work from `develop`. Always test locally before pushing.**
+
+```bash
+git pull origin develop              # Start here
+# ... make changes ...
+poetry run pytest tests/ -v          # Test locally
+git push origin develop              # Only after tests pass
+```
+
+See `docs/DEV_WORKFLOW.md` for full workflow details.
 
 ## AI Skills Reference
 
