@@ -84,6 +84,59 @@ docker compose -f docker-compose-airflow.yml up -d
 docker compose -f docker-compose-airflow.yml down
 ```
 
+## Change Checklist (Don't Skip These)
+
+When making changes, **always check if these need updating**:
+
+### Adding a New Feature/Component
+
+| Item | Location | Action |
+|------|----------|--------|
+| README.md | Root | Add to Stack table, CLI section, Ports table, Docs table |
+| Architecture | `docs/architecture.md` | Add component section, update diagrams |
+| CLI Reference | `docs/guides/cli-reference.md` | Add new commands |
+| Configuration | `docs/getting-started/configuration.md` | Add env vars, config options |
+| Local Deployment | `docs/deployment/local.md` | Update architecture diagram, ports |
+| CLAUDE.md | Root | Update Key Files, Ports, Quick Commands |
+| Tests | `tests/` | Add unit tests, integration tests |
+
+### Changing Existing Feature
+
+| Item | Check |
+|------|-------|
+| Docs match behavior? | All references to the feature still accurate? |
+| Tests updated? | Tests cover the new behavior? |
+| CLAUDE.md current? | Agent instructions still valid? |
+| Breaking change? | Documented in DEV_WORKFLOW.md? |
+
+### Adding New Scripts/Files
+
+| Item | Action |
+|------|--------|
+| `scripts/` structure | Follow existing organization (quickstarts/, connectivity/, etc.) |
+| Tests | Add test in appropriate test file |
+| Documentation | Reference in relevant guide |
+| CLAUDE.md | Add to Key Files if important |
+
+### Example: Adding Airflow
+
+When Airflow was added, these files needed updating:
+
+```
+README.md                         # Stack, CLI, Ports, Docs table, Architecture
+docs/architecture.md              # New section, network diagram, version matrix
+docs/guides/cli-reference.md      # start/stop/logs commands
+docs/guides/airflow.md            # New guide (created)
+docs/deployment/local.md          # Architecture diagram, ports
+docs/getting-started/configuration.md  # Env vars, scripts structure
+CLAUDE.md                         # Ports, Key Files
+tests/test_airflow_dags.py        # New test file
+tests/test_airflow_setup.py       # New test file
+tests/integration/test_airflow_integration.py  # New test file
+```
+
+**If you add a component and only update the component files, the docs are incomplete.**
+
 ## Daily Workflow
 
 ### Starting Work
@@ -231,4 +284,13 @@ git rebase --continue
 1. **Always pull develop first**: `git pull origin develop`
 2. **Run tests before suggesting push**: `poetry run pytest tests/ -v`
 3. **Check CI status after push**: `gh run list --limit 3`
-4. **Update this doc when branch state changes significantly**
+4. **Update docs when adding features**: See "Change Checklist" above
+5. **Update this doc when branch state changes significantly**
+
+### Common Mistakes to Avoid
+
+- Adding a feature without updating README.md Stack/Ports tables
+- Adding CLI commands without updating cli-reference.md
+- Adding components without updating architecture.md
+- Changing behavior without updating CLAUDE.md
+- Adding files without adding tests
