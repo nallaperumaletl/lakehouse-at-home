@@ -61,6 +61,7 @@ Start services.
 ./lakehouse start all              # Start Spark + Kafka
 ./lakehouse start spark            # Start Spark only
 ./lakehouse start kafka            # Start Kafka only
+./lakehouse start airflow          # Start Airflow (scheduler + webserver)
 ./lakehouse start spark --version 4.0  # Start Spark 4.0
 ```
 
@@ -74,6 +75,7 @@ Stop services.
 ./lakehouse stop all
 ./lakehouse stop spark
 ./lakehouse stop kafka
+./lakehouse stop airflow
 ./lakehouse stop spark --version 4.0
 ```
 
@@ -96,6 +98,8 @@ View service logs (follows/tails).
 ./lakehouse logs spark-worker
 ./lakehouse logs kafka
 ./lakehouse logs zookeeper
+./lakehouse logs airflow-webserver
+./lakehouse logs airflow-scheduler
 ./lakehouse logs spark-master --version 4.0
 ```
 
@@ -235,7 +239,31 @@ The CLI reads from `.env`:
 - `POSTGRES_HOST` - Database host
 - `S3_*` - S3/SeaweedFS settings
 
+## Airflow Commands
+
+```bash
+# Start Airflow
+./lakehouse start airflow
+
+# Stop Airflow
+./lakehouse stop airflow
+
+# View logs
+./lakehouse logs airflow-webserver
+./lakehouse logs airflow-scheduler
+./lakehouse logs airflow-triggerer
+
+# Trigger a DAG manually
+docker exec airflow-webserver airflow dags trigger lakehouse_medallion_pipeline
+
+# List DAG runs
+docker exec airflow-webserver airflow dags list-runs -d lakehouse_medallion_pipeline
+```
+
+See [Airflow Guide](airflow.md) for DAG details and configuration.
+
 ## See Also
 
 - [Configuration](../getting-started/configuration.md)
+- [Airflow Guide](airflow.md)
 - [Troubleshooting](../troubleshooting.md)

@@ -3,7 +3,7 @@
 A fully open-source, self-hostable data lakehouse for local development and testing of modern data workflows. Run production-grade infrastructure on your laptop with Apache Spark, Iceberg, and Kafka - no cloud account required. Includes a realistic data generation framework to test batch and streaming pipelines.
 
 [![CI](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml/badge.svg)](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/lisancao/lakehouse-at-home/branch/main/graph/badge.svg)](https://codecov.io/gh/lisancao/lakehouse-at-home)
+[![codecov](https://codecov.io/gh/lisancao/lakehouse-at-home/branch/master/graph/badge.svg)](https://codecov.io/gh/lisancao/lakehouse-at-home)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/lisancao/lakehouse-at-home)](https://github.com/lisancao/lakehouse-at-home/stargazers)
 [![Spark](https://img.shields.io/badge/Spark-4.0%20%7C%204.1-E25A1C?logo=apachespark&logoColor=white)](https://spark.apache.org/)
@@ -22,6 +22,7 @@ A fully open-source, self-hostable data lakehouse for local development and test
 | Apache Spark | 4.0 / 4.1 | Distributed compute |
 | Apache Iceberg | 1.10 | ACID table format |
 | Apache Kafka | 3.6 | Event streaming |
+| Apache Airflow | 3.1 | Workflow orchestration |
 | PostgreSQL | 16 | Catalog metadata |
 | SeaweedFS | - | S3-compatible storage |
 | Unity Catalog | 0.3.1 | REST catalog (optional) |
@@ -90,6 +91,11 @@ See [Installation Guide](docs/getting-started/installation.md) for detailed OS-s
 # Unity Catalog (optional)
 ./lakehouse start unity-catalog  # Start Unity Catalog REST server
 ./lakehouse stop unity-catalog   # Stop Unity Catalog
+
+# Airflow (optional)
+./lakehouse start airflow        # Start Airflow scheduler + webserver
+./lakehouse stop airflow         # Stop Airflow
+./lakehouse logs airflow-webserver  # View Airflow logs
 ```
 
 See [CLI Reference](docs/guides/cli-reference.md) for all commands.
@@ -115,6 +121,7 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | [Configuration](docs/getting-started/configuration.md) | Environment and Spark config |
 | [CLI Reference](docs/guides/cli-reference.md) | All commands |
 | [Streaming](docs/guides/streaming.md) | Kafka + Spark streaming |
+| [Airflow](docs/guides/airflow.md) | Workflow orchestration |
 | [Multi-Version Spark](docs/guides/multi-version.md) | Run 4.0 and 4.1 together |
 | [Unity Catalog](docs/guides/unity-catalog.md) | REST catalog setup & migration |
 | [Architecture](docs/architecture.md) | System design |
@@ -146,6 +153,14 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 │  (direct to Spark,   │    └──────────────────────────┬────────────────────────────┘
 │   not via catalog)   │                               │
 └──────────────────────┘                               │ Iceberg API
+                                                       │
+┌──────────────────────┐                               │
+│  ORCHESTRATION       │                               │
+│                      │───────────────────────────────┤
+│  Airflow (:8085)     │  Schedules Spark jobs,        │
+│  └─ DAGs             │  Iceberg maintenance          │
+│  └─ Sensors          │                               │
+└──────────────────────┘                               │
                                                        ▼
                             ┌───────────────────────────────────────────────────────┐
                             │                 CATALOG: Iceberg Metadata             │
@@ -192,6 +207,7 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | Spark 4.0 | 7077 | http://localhost:8080 |
 | Spark 4.1 | 7078 | http://localhost:8082 |
 | Kafka | 9092 | - |
+| Airflow | 8085 | http://localhost:8085 |
 | Unity Catalog | 8080 | REST API |
 
 ## Cloud Deployment

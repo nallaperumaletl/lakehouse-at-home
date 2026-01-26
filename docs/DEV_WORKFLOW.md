@@ -1,6 +1,17 @@
-# Development Workflow for Claude Assistants
+# Development Workflow
 
-This document provides context for AI assistants working on the lakehouse-stack project.
+This document defines the development workflow for the lakehouse-stack project.
+
+## Golden Rule
+
+**Always work from `develop`. Always test locally before pushing.**
+
+```
+git pull origin develop    # Start here
+# ... make changes ...
+# ... run local tests ...
+git push origin develop    # Only after tests pass
+```
 
 ## Branch Strategy
 
@@ -8,214 +19,278 @@ This document provides context for AI assistants working on the lakehouse-stack 
 master ← develop ← feature branches
 ```
 
-- **`master`**: Production releases only
-- **`develop`**: Integration branch, all features merge here first
-- **`feature/*`**: Individual feature work, PRs target `develop`
+| Branch | Purpose | Who pushes |
+|--------|---------|------------|
+| `master` | Production releases | Merge from develop only |
+| `develop` | **Primary working branch** | All development |
+| `feature/*` | Isolated feature work | PRs to develop |
 
-## Current Branch State (Updated: 2026-01-19)
+## Local Testing (Required Before Push)
 
-### Branch Relationships
+Before pushing ANY changes to develop, run these stability tests:
 
-```
-master/develop (dadf981) - In sync
-    │
-    │   [MERGED] Phase 0-1: CI/CD, testing, security
-    │
-    ├── feature/lance-multimodal (b4eba29) - Lance/LanceDB integration
-    │
-    ├── feature/unity-catalog-oss (385eeac) - Unity Catalog [PR #11]
-    │       └── Rebased on develop, integration tests added
-    │
-    └── feature/airflow-orchestration (0639417) - Airflow + Unity Catalog
-```
-
-### Branch Contents
-
-| Branch | Purpose | Status | Key Files |
-|--------|---------|--------|-----------|
-| `master/develop` | Main branches (synced) | Active | All core infrastructure |
-| `feature/lance-multimodal` | Lance vector DB | Ready for PR | `docker-compose-lance.yml`, `scripts/05-10*.py` |
-| `feature/unity-catalog-oss` | Unity Catalog | **PR #11 Open** | `docker-compose-unity-catalog.yml`, `docs/guides/unity-catalog.md`, `tests/integration/test_unity_catalog.py` |
-| `feature/airflow-orchestration` | Airflow DAGs | Blocked (needs UC) | `dags/`, `docker-compose-airflow.yml` |
-
-### What's in master/develop
-
-After Phase 0-1 merge:
-- Comprehensive CI/CD pipeline (`.github/workflows/ci.yml`)
-- Integration test suite (`tests/integration/`)
-- Security infrastructure (`SECURITY.md`, `.pre-commit-config.yaml`, `tests/test_security.py`)
-- Enhanced CLI with preflight checks (`lakehouse`)
-- JAR download with retry logic (`scripts/download-jars.sh`)
-- Multi-version Spark testing (`scripts/connectivity/test-spark-versions.sh`)
-- Schema migrations (`schemas/`)
-
-### Pending in feature/unity-catalog-oss (PR #11)
-
-- Unity Catalog OSS deployment (`docker-compose-unity-catalog.yml`)
-- Spark REST catalog configuration (`config/spark/spark-defaults-uc.conf.example`)
-- Unity Catalog guide (`docs/guides/unity-catalog.md`)
-- Demo script (`scripts/quickstarts/unity-catalog-demo.py`)
-- Integration tests (`tests/integration/test_unity_catalog.py` - 17 tests)
-
-## Integration Plan
-
-### Phase Status
-
-| Phase | Description | Status | Notes |
-|-------|-------------|--------|-------|
-| 0-1 | Foundation hardening, CI/CD, tests, security | **DONE** | Merged to master |
-| 2 | Unity Catalog OSS | **PR OPEN** | PR #11, rebased with tests |
-| 3 | Lance + multimodal | Ready | Can PR now (parallel with Phase 2) |
-| 4 | Airflow orchestration | Blocked | Needs Phase 2 first |
-
-### Merge Order (Dependencies)
-
-```
-[DONE] 1. Phase 0-1 → develop → master
-[PR #11] 2. feature/unity-catalog-oss → develop (17 tests, rebased)
-[READY] 3. feature/lance-multimodal → develop (no blocking deps)
-[BLOCKED] 4. feature/airflow-orchestration → develop (needs Phase 2)
-```
-
-## Security Requirements
-
-Before merging any PR:
-
-1. **Run pre-commit hooks**: `pre-commit run --all-files`
-2. **Run security tests**: `poetry run pytest -m security -v`
-3. **Check for secrets**: No hardcoded credentials
-4. **Verify CI passes**: All stages green
-
-See `SECURITY.md` for full guidelines.
-
-## Commands Reference
-
-### Check Branch State
+### 1. Quick Validation (Always)
 
 ```bash
-# List all branches
-git branch -a
+# Syntax and lint checks
+poetry run ruff check scripts/ tests/ dags/
+poetry run black --check scripts/ tests/ dags/
 
-# Compare branch to develop
-git log --oneline develop..BRANCH_NAME
-
-# View diff stats
-git diff --stat develop...BRANCH_NAME
-
-# Check uncommitted files
-git status --short
-
-# Check CI status
-gh run list --limit 5
+# Unit tests (fast)
+poetry run pytest tests/ --ignore=tests/integration/ -v
 ```
 
-### Testing
+### 2. Full Local Test (Before Significant Changes)
 
 ```bash
-# Install dependencies
-poetry install --with dev,test
-
-# Run all tests
+# All tests including integration
 poetry run pytest tests/ -v
 
-# Run by category
-poetry run pytest tests/ --ignore=tests/integration/  # Unit only
-poetry run pytest tests/integration/ -v               # Integration only
-poetry run pytest -m security -v                      # Security only
-
-# Multi-version Spark tests
-./scripts/connectivity/test-spark-versions.sh -v 4.1 -t all
-
-# Lint/format
-poetry run ruff check scripts/ tests/ --fix
-poetry run black scripts/ tests/
-
 # Security checks
+poetry run pytest -m security -v
 pre-commit run --all-files
-```
 
-### PR Workflow
-
-```bash
-# Create PR to develop
-gh pr create --base develop --title "feat: description"
-
-# Check PR status
-gh pr list
-gh pr checks PR_NUMBER
-
-# Merge PR (after approval)
-gh pr merge PR_NUMBER --squash
-```
-
-### Service Management
-
-```bash
-# Setup (first time)
+# CLI validation
 ./lakehouse setup
-
-# Start all services
-./lakehouse start all
-
-# Check status
 ./lakehouse status --json
+```
+
+### 3. Service Tests (When Touching Infrastructure)
+
+```bash
+# Start services
+./lakehouse start all
 
 # Run connectivity tests
 ./lakehouse test
 
-# View logs
-./lakehouse logs spark-master-41
+# Test Spark versions
+./scripts/connectivity/test-spark-versions.sh -v 4.1 -t all
+
+# Stop services
+./lakehouse stop all
 ```
 
-## For Claude Assistants
+### 4. Airflow Tests (When Touching DAGs)
 
-### Before Starting Work
+```bash
+# DAG syntax validation
+poetry run pytest tests/test_airflow_dags.py -v
 
-1. Check current branch: `git branch --show-current`
-2. Pull latest: `git pull origin develop`
-3. Check for uncommitted changes: `git status --short`
-4. Review this file for current integration status
-5. Read `SECURITY.md` for security guidelines
+# Build and test Airflow locally
+docker compose -f docker-compose-airflow.yml build
+docker compose -f docker-compose-airflow.yml up -d
+# Check http://localhost:8085 loads and DAGs appear
+docker compose -f docker-compose-airflow.yml down
+```
 
-### When Creating New Features
+## Change Checklist (Don't Skip These)
 
-1. Branch from `develop`: `git checkout -b feature/NAME develop`
-2. Install pre-commit hooks: `pre-commit install`
-3. Make changes with tests
-4. Run `poetry run pytest tests/`
-5. Run `pre-commit run --all-files`
-6. Create PR to `develop` (not `master`)
+When making changes, **always check if these need updating**:
 
-### When Merging Branches
+### Adding a New Feature/Component
 
-1. Check dependencies in "Merge Order" above
-2. Ensure CI passes on the PR
-3. Run security tests: `poetry run pytest -m security`
-4. Merge to develop first, then develop → master
-5. Update this file with new branch state
+| Item | Location | Action |
+|------|----------|--------|
+| README.md | Root | Add to Stack table, CLI section, Ports table, Docs table |
+| Architecture | `docs/architecture.md` | Add component section, update diagrams |
+| CLI Reference | `docs/guides/cli-reference.md` | Add new commands |
+| Configuration | `docs/getting-started/configuration.md` | Add env vars, config options |
+| Local Deployment | `docs/deployment/local.md` | Update architecture diagram, ports |
+| CLAUDE.md | Root | Update Key Files, Ports, Quick Commands |
+| Tests | `tests/` | Add unit tests, integration tests |
 
-### Critical Files
+### Changing Existing Feature
 
-| File | Purpose | Caution |
-|------|---------|---------|
-| `lakehouse` | CLI script | Security-sensitive (input validation) |
-| `config/spark/spark-defaults.conf` | Spark config | **Never commit** (credentials) |
-| `.env` | Environment variables | **Never commit** (credentials) |
-| `scripts/download-jars.sh` | JAR downloads | Version-sensitive |
-| `.github/workflows/ci.yml` | CI pipeline | Security-sensitive (pinned actions) |
-| `.pre-commit-config.yaml` | Security hooks | Keep updated |
+| Item | Check |
+|------|-------|
+| Docs match behavior? | All references to the feature still accurate? |
+| Tests updated? | Tests cover the new behavior? |
+| CLAUDE.md current? | Agent instructions still valid? |
+| Breaking change? | Documented in DEV_WORKFLOW.md? |
 
-### Version Constraints (Do Not Change)
+### Adding New Scripts/Files
 
-- AWS SDK v2: **2.24.6** (exact match for Hadoop 3.4.1)
-- Iceberg: **1.10.0**
-- Spark: **4.0.1** or **4.1.0** (Scala 2.13)
-- Poetry: **2.1.0**
+| Item | Action |
+|------|--------|
+| `scripts/` structure | Follow existing organization (quickstarts/, connectivity/, etc.) |
+| Tests | Add test in appropriate test file |
+| Documentation | Reference in relevant guide |
+| CLAUDE.md | Add to Key Files if important |
 
-## Updating This Document
+### Example: Adding Airflow
 
-When branch state changes significantly:
-1. Update "Branch Relationships" diagram
-2. Update "Branch Contents" table
-3. Update "Phase Status" table
-4. Commit: `git commit -m "docs: update DEV_WORKFLOW branch state"`
+When Airflow was added, these files needed updating:
+
+```
+README.md                         # Stack, CLI, Ports, Docs table, Architecture
+docs/architecture.md              # New section, network diagram, version matrix
+docs/guides/cli-reference.md      # start/stop/logs commands
+docs/guides/airflow.md            # New guide (created)
+docs/deployment/local.md          # Architecture diagram, ports
+docs/getting-started/configuration.md  # Env vars, scripts structure
+CLAUDE.md                         # Ports, Key Files
+tests/test_airflow_dags.py        # New test file
+tests/test_airflow_setup.py       # New test file
+tests/integration/test_airflow_integration.py  # New test file
+```
+
+**If you add a component and only update the component files, the docs are incomplete.**
+
+## Daily Workflow
+
+### Starting Work
+
+```bash
+# 1. Always start from develop
+git checkout develop
+git pull origin develop
+
+# 2. Check current state
+git status --short
+./lakehouse status --json
+```
+
+### Making Changes
+
+```bash
+# 3. Make your changes
+# ... edit files ...
+
+# 4. Run local tests (REQUIRED)
+poetry run pytest tests/ --ignore=tests/integration/ -v
+poetry run ruff check scripts/ tests/ dags/
+
+# 5. Commit
+git add <specific files>
+git commit -m "type: description"
+
+# 6. Push only after tests pass
+git push origin develop
+```
+
+### Feature Branches (For Larger Work)
+
+```bash
+# Create feature branch from develop
+git checkout develop
+git pull origin develop
+git checkout -b feature/my-feature
+
+# Work on feature...
+# Run local tests...
+
+# Create PR to develop
+gh pr create --base develop --title "feat: description"
+
+# After PR approved and CI passes, merge
+gh pr merge --squash
+```
+
+## CI/CD Pipeline
+
+CI runs automatically on push to develop. However, **local testing catches issues faster**.
+
+| Stage | What it checks | Run locally with |
+|-------|----------------|------------------|
+| Lint | Code style | `poetry run ruff check .` |
+| Security | Credentials, vulnerabilities | `pre-commit run --all-files` |
+| Unit Tests | Logic correctness | `poetry run pytest tests/ --ignore=tests/integration/` |
+| Integration | Service connectivity | `poetry run pytest tests/integration/` |
+| Build | Docker images | `docker compose build` |
+
+## Current State (Updated: 2026-01-25)
+
+### What's in develop
+
+- Core infrastructure (Spark 4.0/4.1, Iceberg 1.10, Kafka 3.6)
+- Airflow 3.1.6 orchestration (`dags/`, `docker-compose-airflow.yml`)
+- Comprehensive CI/CD pipeline
+- Integration test suite
+- Scripts reorganized into `quickstarts/`, `connectivity/`, `pipelines/`, `tools/`
+- Test data generation framework
+
+### Active Feature Branches
+
+| Branch | Purpose | Status |
+|--------|---------|--------|
+| `feature/unity-catalog-oss` | Unity Catalog OSS | PR #11 open |
+| `documentation` | Docs improvements | Active |
+
+### Archived/Removed
+
+- Lance/LanceDB integration (moved to separate branch, not in develop)
+
+## Critical Versions (Do Not Change Without Testing)
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| AWS SDK v2 | 2.24.6 | Exact match for Hadoop 3.4.1 |
+| Iceberg | 1.10.0 | |
+| Spark | 4.0.1 / 4.1.0 | Scala 2.13 |
+| Airflow | 3.1.6 | Python 3.12, breaking changes from 2.x |
+| Java (Spark 4.0) | 17 | From official image |
+| Java (Spark 4.1) | 21 | From official image |
+| Java (Airflow) | 17 | Sufficient for scheduling |
+
+## Files That Should Never Be Committed
+
+| File | Why |
+|------|-----|
+| `.env` | Contains credentials |
+| `config/spark/spark-defaults.conf` | Contains credentials |
+| `*.jar` | Large binaries |
+| `logs/` | Runtime artifacts |
+| `.coverage` | Test artifacts |
+
+## Troubleshooting
+
+### Tests Fail Locally But Pass in CI
+
+```bash
+# Ensure clean state
+poetry install --with dev,test
+git clean -fd  # Remove untracked files (careful!)
+```
+
+### CI Fails But Tests Pass Locally
+
+```bash
+# Check you have latest develop
+git pull origin develop
+
+# Run the exact CI commands
+poetry run ruff check scripts/ tests/ dags/ --config pyproject.toml
+poetry run pytest tests/ -v --tb=short
+```
+
+### Merge Conflicts
+
+```bash
+# Update develop first
+git checkout develop
+git pull origin develop
+
+# Rebase your feature branch
+git checkout feature/my-feature
+git rebase develop
+
+# Resolve conflicts, then continue
+git rebase --continue
+```
+
+## For AI Assistants
+
+1. **Always pull develop first**: `git pull origin develop`
+2. **Run tests before suggesting push**: `poetry run pytest tests/ -v`
+3. **Check CI status after push**: `gh run list --limit 3`
+4. **Update docs when adding features**: See "Change Checklist" above
+5. **Update this doc when branch state changes significantly**
+
+### Common Mistakes to Avoid
+
+- Adding a feature without updating README.md Stack/Ports tables
+- Adding CLI commands without updating cli-reference.md
+- Adding components without updating architecture.md
+- Changing behavior without updating CLAUDE.md
+- Adding files without adding tests

@@ -9,6 +9,7 @@ Welcome to the Lakehouse Stack documentation. This guide covers everything you n
 | [Quickstart](getting-started/quickstart.md) | Get up and running in 5 minutes |
 | [Installation](getting-started/installation.md) | Detailed setup for macOS, Ubuntu, Windows |
 | [Data Pipelines](guides/pipelines.md) | Build medallion pipelines (imperative vs declarative) |
+| [Airflow Orchestration](guides/airflow.md) | Workflow orchestration with Apache Airflow |
 | [CLI Reference](guides/cli-reference.md) | All available commands |
 | [AWS Deployment](deployment/aws.md) | Deploy to production on AWS |
 | [Databricks Deployment](deployment/databricks.md) | Deploy to Databricks |
@@ -33,6 +34,7 @@ docs/
 │   ├── installation.md     # OS-specific install guides
 │   └── configuration.md    # Environment and Spark config
 ├── guides/
+│   ├── airflow.md          # Workflow orchestration with Airflow
 │   ├── cli-reference.md    # All CLI commands
 │   ├── pipelines.md        # Data pipelines (imperative vs declarative)
 │   ├── test-data.md        # Generating test data
