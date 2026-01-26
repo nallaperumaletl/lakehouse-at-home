@@ -388,7 +388,7 @@ Airflow Scheduler
        │
        │ BashOperator
        ▼
-docker exec spark-master-41 spark-submit /scripts/pipelines/pipeline.py
+docker exec spark-master-41 spark-submit /scripts/pipelines/pipeline_spark41.py
        │
        │ (job runs in Spark container with Java 21)
        ▼

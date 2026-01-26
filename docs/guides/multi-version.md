@@ -61,7 +61,7 @@ The lakehouse stack supports running both Spark versions at the same time, each 
 # Via Docker
 docker exec spark-master /opt/spark/bin/spark-submit \
   --master spark://localhost:7077 \
-  /scripts/my-job.py
+  /scripts/quickstarts/01-basics.py
 
 # Local spark-submit (requires Java 17)
 spark-submit --master spark://localhost:7077 scripts/my-job.py
@@ -73,7 +73,7 @@ spark-submit --master spark://localhost:7077 scripts/my-job.py
 # Via Docker
 docker exec spark-master-41 /opt/spark/bin/spark-submit \
   --master spark://localhost:7078 \
-  /scripts/my-job.py
+  /scripts/quickstarts/01-basics.py
 
 # Local spark-submit (requires Java 21)
 spark-submit --master spark://localhost:7078 scripts/my-job.py
@@ -136,10 +136,10 @@ diff results-4.0.txt results-4.1.txt
 
 ```bash
 # Time execution on 4.0
-time docker exec spark-master /opt/spark/bin/spark-submit /scripts/benchmark.py
+time docker exec spark-master /opt/spark/bin/spark-submit /scripts/quickstarts/iceberg-spark-quickstart.py
 
 # Time execution on 4.1
-time docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/benchmark.py
+time docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/quickstarts/iceberg-spark-quickstart.py
 ```
 
 ## Migration Testing
@@ -148,7 +148,7 @@ time docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/benchmark.
 
 ```bash
 ./lakehouse start spark --version 4.0
-docker exec spark-master /opt/spark/bin/spark-submit /scripts/my-app.py
+docker exec spark-master /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py
 # Verify output
 ```
 
@@ -156,7 +156,7 @@ docker exec spark-master /opt/spark/bin/spark-submit /scripts/my-app.py
 
 ```bash
 ./lakehouse start spark --version 4.1
-docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/my-app.py
+docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py
 # Verify output matches
 ```
 

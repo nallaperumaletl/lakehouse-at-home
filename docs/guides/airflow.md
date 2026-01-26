@@ -187,7 +187,7 @@ with DAG(
         task_id="run_spark_job",
         bash_command=f"""
             docker exec {SPARK_CONTAINER} /opt/spark/bin/spark-submit \
-                /scripts/pipelines/my_script.py
+                /scripts/pipelines/pipeline_spark41.py
         """,
     )
 ```

@@ -226,8 +226,8 @@ fi
 ./lakehouse start spark --version 4.1
 
 # Run same job on both
-docker exec spark-master /opt/spark/bin/spark-submit /scripts/job.py
-docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/job.py
+docker exec spark-master /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py
+docker exec spark-master-41 /opt/spark/bin/spark-submit /scripts/quickstarts/01-basics.py
 
 # Compare results...
 ```
