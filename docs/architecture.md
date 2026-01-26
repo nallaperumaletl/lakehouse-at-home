@@ -351,6 +351,75 @@ Producer ──▶ Kafka Topic ──▶ Spark Streaming ──▶ Iceberg Table
 
 ---
 
+### Apache Airflow 3.x
+
+**Role**: Workflow orchestration for scheduled Spark jobs and Iceberg maintenance.
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Airflow (port 8085)                     │
+│                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │   API Server    │  │    Scheduler    │  │  Triggerer  │ │
+│  │  (webserver)    │  │   (DAG runs)    │  │  (sensors)  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
+│           │                   │                    │        │
+│           └───────────────────┴────────────────────┘        │
+│                               │                              │
+│                    docker exec spark-master-41               │
+│                          spark-submit                        │
+└───────────────────────────────┬──────────────────────────────┘
+                                │
+                                ▼
+                    ┌─────────────────────┐
+                    │   Spark Cluster     │
+                    │   (runs the jobs)   │
+                    └─────────────────────┘
+```
+
+#### How Airflow Executes Spark Jobs
+
+Airflow runs in its own container and executes Spark jobs via `docker exec`:
+
+```
+Airflow Scheduler
+       │
+       │ BashOperator
+       ▼
+docker exec spark-master-41 spark-submit /scripts/pipelines/pipeline.py
+       │
+       │ (job runs in Spark container with Java 21)
+       ▼
+   Iceberg Tables
+```
+
+This pattern means:
+- Airflow schedules and monitors, Spark executes
+- Jobs use Spark container's JVM (Java 21 for Spark 4.1)
+- Airflow container only needs Java 17 for its own operations
+
+#### Included DAGs
+
+| DAG | Schedule | Purpose |
+|-----|----------|---------|
+| `lakehouse_medallion_pipeline` | Daily | Bronze → Silver → Gold pipeline |
+| `iceberg_maintenance` | Daily 3 AM | Expire snapshots, remove orphans, compact files |
+| `iceberg_compact_on_demand` | Manual | On-demand table compaction |
+
+#### Airflow 3.x Notes
+
+Airflow 3.x has breaking changes from 2.x:
+- `webserver` command → `api-server`
+- `schedule_interval` → `schedule`
+- Operators moved to `airflow.providers.standard.*`
+- Health endpoint: `/api/v2/monitor/health`
+
+See [Airflow Guide](guides/airflow.md) for details.
+
+---
+
 ### SeaweedFS
 
 **Role**: S3-compatible object storage for all persistent data.
@@ -581,6 +650,7 @@ All services use `network_mode: host` for simplicity:
 │  │  Spark UI 4.1 ───────────────────────────── :8082   │    │
 │  │  Kafka ──────────────────────────────────── :9092   │    │
 │  │  Zookeeper ──────────────────────────────── :2181   │    │
+│  │  Airflow (optional) ─────────────────────── :8085   │    │
 │  │  Unity Catalog (optional) ───────────────── :8080   │    │
 │  │                                                      │    │
 │  └─────────────────────────────────────────────────────┘    │
@@ -605,6 +675,7 @@ Critical version combinations for stability:
 | AWS SDK v2 | **2.24.6** | **Exact version required** |
 | Kafka | 3.6.1 | Confluent images |
 | PostgreSQL | 16 | Iceberg catalog |
+| Airflow | 3.1.6 | Python 3.12, Java 17 |
 | Unity Catalog | 0.3.1 | Optional REST catalog |
 
 **Critical**: AWS SDK version must be exactly 2.24.6 for Hadoop 3.4.1 compatibility. Other versions cause S3A authentication failures.
@@ -620,12 +691,21 @@ lakehouse-stack/
 │   │   ├── spark-defaults.conf       # Active config (from .example)
 │   │   ├── spark-defaults.conf.example
 │   │   └── spark-defaults-uc.conf.example
+│   ├── airflow/
+│   │   └── setup_connections.sh       # Airflow connection setup
 │   └── unity-catalog/
 │       └── server.properties          # Unity Catalog config
+├── dags/                              # Airflow DAG definitions
+│   ├── lakehouse_medallion_pipeline.py
+│   └── iceberg_maintenance.py
 ├── data/                              # Generated test data
+├── docker/
+│   └── airflow/
+│       └── Dockerfile                 # Custom Airflow image
 ├── docker-compose.yml                 # Spark 4.0
 ├── docker-compose-spark41.yml         # Spark 4.1
 ├── docker-compose-kafka.yml           # Kafka + Zookeeper
+├── docker-compose-airflow.yml         # Airflow orchestration
 ├── docker-compose-unity-catalog.yml   # Unity Catalog OSS
 ├── jars/                              # Spark dependencies (~860MB)
 │   ├── iceberg-spark-runtime-*.jar
@@ -643,6 +723,7 @@ lakehouse-stack/
 
 - [Configuration Guide](getting-started/configuration.md)
 - [Streaming Guide](guides/streaming.md)
+- [Airflow Guide](guides/airflow.md)
 - [Unity Catalog Guide](guides/unity-catalog.md)
 - [Multi-Version Spark](guides/multi-version.md)
 - [AWS Deployment](deployment/aws.md)

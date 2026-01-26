@@ -21,6 +21,9 @@ This guide covers running the lakehouse stack on your local machine for developm
 │                                       │ │  Kafka   │ │  │
 │                                       │ ├──────────┤ │  │
 │                                       │ │Zookeeper │ │  │
+│                                       │ ├──────────┤ │  │
+│                                       │ │ Airflow  │ │  │
+│                                       │ │(optional)│ │  │
 │                                       │ └──────────┘ │  │
 │                                       └──────────────┘  │
 └─────────────────────────────────────────────────────────┘
@@ -57,6 +60,7 @@ Required:
 | Spark 4.1 Master | 7078 | http://localhost:8082 |
 | Kafka | 9092 | - |
 | Zookeeper | 2181 | - |
+| Airflow (optional) | 8085 | http://localhost:8085 |
 | Unity Catalog (optional) | 8080 | REST API |
 
 **Note**: Unity Catalog and Spark 4.0 UI both use port 8080. Run one at a time, or reconfigure.
@@ -172,4 +176,5 @@ Quick checks:
 
 - [Test Data Generation](../guides/test-data.md)
 - [Streaming Guide](../guides/streaming.md)
+- [Airflow Orchestration](../guides/airflow.md)
 - [AWS Deployment](aws.md) - For production
