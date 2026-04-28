@@ -27,8 +27,6 @@ POSTGRES_PORT=5432
 
 # SeaweedFS (S3-compatible storage)
 S3_ENDPOINT=http://host.docker.internal:8333
-S3_ACCESS_KEY=any_string_here
-S3_SECRET_KEY=any_string_here
 S3_BUCKET=lakehouse
 S3_WAREHOUSE=s3a://lakehouse/warehouse
 
@@ -65,10 +63,9 @@ spark.sql.catalog.iceberg.warehouse=s3a://lakehouse/warehouse
 
 # S3/SeaweedFS
 spark.hadoop.fs.s3a.endpoint=http://host.docker.internal:8333
-spark.hadoop.fs.s3a.access.key=any_string
-spark.hadoop.fs.s3a.secret.key=any_string
 spark.hadoop.fs.s3a.path.style.access=true
 spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider
 
 # Performance
 spark.sql.adaptive.enabled=true

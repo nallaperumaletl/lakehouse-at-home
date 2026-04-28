@@ -10,11 +10,12 @@ spark.sql.catalog.iceberg.jdbc.schema-version  V1
 
 # S3 configuration for SeaweedFS
 spark.hadoop.fs.s3a.endpoint        http://localhost:8333
-spark.hadoop.fs.s3a.access.key      your_access_key
-spark.hadoop.fs.s3a.secret.key      your_secret_key
 spark.hadoop.fs.s3a.path.style.access true
 spark.hadoop.fs.s3a.impl            org.apache.hadoop.fs.s3a.S3AFileSystem
 spark.hadoop.fs.s3a.connection.ssl.enabled false
+# SeaweedFS started with `weed server -s3` typically runs without auth and rejects signed requests.
+# Use anonymous (unsigned) S3 requests so Spark can read/write objects.
+spark.hadoop.fs.s3a.aws.credentials.provider org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider
 
 # Iceberg and S3 JARs
 spark.jars  /opt/spark/jars-extra/iceberg-spark-runtime-4.0_2.13-1.10.0.jar,/opt/spark/jars-extra/hadoop-aws-3.4.1.jar,/opt/spark/jars-extra/aws-java-sdk-bundle-1.12.780.jar,/opt/spark/jars-extra/bundle-2.24.6.jar,/opt/spark/jars-extra/postgresql-42.7.4.jar

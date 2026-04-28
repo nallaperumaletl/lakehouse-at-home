@@ -200,13 +200,15 @@ events_df = spark.read.parquet(events_path)
 events_df = events_df.withColumn(
     "event_timestamp",
     f.coalesce(
-        f.to_timestamp("ts", "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"),
-        f.to_timestamp("ts", "yyyy-MM-dd'T'HH:mm:ss")
+        # Spark 4.1 runs ANSI time parsing by default; use `try_to_timestamp` to tolerate
+        # invalid/missing fractional seconds and return NULL instead of failing the job.
+        f.try_to_timestamp("ts", f.lit("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")),
+        f.try_to_timestamp("ts", f.lit("yyyy-MM-dd'T'HH:mm:ss"))
     )
 )
 
 events_df.write.mode("overwrite").saveAsTable("iceberg.bronze.orders")
-print(f"   - iceberg.bronze.orders ({{events_df.count():,}} events)")
+print("   - iceberg.bronze.orders")
 
 print("\\nDone! Tables created:")
 print("  - iceberg.bronze.dim_categories")

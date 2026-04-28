@@ -2,13 +2,19 @@ services:
   spark-master-41:
     image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
     container_name: spark-master-41
-    network_mode: "host"
+    hostname: spark-master-41
+    ports:
+      - "7078:7078"
+      - "8082:8082"
+      # Spark application UI ports (driver UI). When you run `spark-submit` inside
+      # this container, the UI typically binds to 4040, 4041, ...
+      - "4040-4050:4040-4050"
     env_file: .env
     environment:
       - SPARK_MASTER_PORT=7078
       - SPARK_MASTER_WEBUI_PORT=8082
     volumes:
-      - /data/spark:/opt/spark-data
+      - ./data/spark:/opt/spark-data
       - ./config/spark:/opt/spark/conf
       - ./notebooks:/notebooks
       - ./jars:/opt/spark/jars-extra
@@ -17,19 +23,38 @@ services:
       - ./data:/data
     command: >
       bash -c "
-        /opt/spark/sbin/start-master.sh --host 0.0.0.0 --port 7078 --webui-port 8082 &&
+        /opt/spark/sbin/start-master.sh --host spark-master-41 --port 7078 --webui-port 8082 &&
         tail -f /opt/spark/logs/*
         "
+
+  # Spark History Server (completed apps / event logs)
+  spark-history-server-41:
+    image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+    container_name: spark-history-server-41
+    hostname: spark-history-server-41
+    ports:
+      - "18080:18080"
+    env_file: .env
+    volumes:
+      - ./data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+    command: >
+      bash -c "
+        /opt/spark/sbin/start-history-server.sh &&
+        tail -f /opt/spark/logs/*
+      "
 
   spark-worker-41:
     image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
     container_name: spark-worker-41
     env_file: .env
-    network_mode: "host"
+    hostname: spark-worker-41
+    ports:
+      - "8083:8083"
     environment:
       - SPARK_WORKER_WEBUI_PORT=8083
     volumes:
-      - /data/spark:/opt/spark-data
+      - ./data/spark:/opt/spark-data
       - ./config/spark:/opt/spark/conf
       - ./notebooks:/notebooks
       - ./jars:/opt/spark/jars-extra
@@ -38,6 +63,6 @@ services:
     command: >
       bash -c "
         sleep 5 &&
-        /opt/spark/sbin/start-worker.sh spark://localhost:7078 --webui-port 8083 &&
+        /opt/spark/sbin/start-worker.sh spark://spark-master-41:7078 --webui-port 8083 &&
         tail -f /opt/spark/logs/*
         "

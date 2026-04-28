@@ -291,15 +291,33 @@ wait_for_services() {
 
     # Kafka/Zookeeper (if started)
     if docker ps --format '{{.Names}}' | grep -q '^zookeeper$'; then
-        wait_for_service "Zookeeper" "nc -z localhost 2181" 30
+        if ! wait_for_service "Zookeeper" "nc -z localhost 2181" 30; then
+            if docker exec zookeeper nc -z localhost 2181 >/dev/null 2>&1; then
+                echo -e "   ${YELLOW}!${NC} Zookeeper is running in Docker but not reachable on localhost:2181"
+                echo -e "   ${YELLOW}→ If you're on macOS Docker Desktop, avoid host networking and use port mappings (see docker-compose-kafka.yml).${NC}"
+            fi
+            return 1
+        fi
     fi
     if docker ps --format '{{.Names}}' | grep -q '^kafka$'; then
-        wait_for_service "Kafka" "nc -z localhost 9092" 30
+        if ! wait_for_service "Kafka" "nc -z localhost 9092" 30; then
+            if docker exec kafka nc -z localhost 9092 >/dev/null 2>&1; then
+                echo -e "   ${YELLOW}!${NC} Kafka is running in Docker but not reachable on localhost:9092"
+                echo -e "   ${YELLOW}→ If you're on macOS Docker Desktop, avoid host networking and use port mappings (see docker-compose-kafka.yml).${NC}"
+            fi
+            return 1
+        fi
     fi
 
     # Spark (if started)
     if docker ps --format '{{.Names}}' | grep -q "^${master_container}$"; then
-        wait_for_service "Spark Master" "nc -z localhost $spark_port" 30
+        if ! wait_for_service "Spark Master" "nc -z localhost $spark_port" 30; then
+            if docker exec "$master_container" nc -z localhost "$spark_port" >/dev/null 2>&1; then
+                echo -e "   ${YELLOW}!${NC} Spark is running in Docker but not reachable on localhost:$spark_port"
+                echo -e "   ${YELLOW}→ If you're on macOS Docker Desktop, avoid host networking and use port mappings (see $(get_spark_compose)).${NC}"
+            fi
+            return 1
+        fi
         wait_for_service "Spark UI" "curl -s http://localhost:$(get_spark_ui_port) >/dev/null" 30
     fi
 }
@@ -474,6 +492,10 @@ EOF
 cmd_status_human() {
     header "LAKEHOUSE STATUS"
 
+    # `lakehouse` runs with `set -e`; status is informational and should not
+    # abort just because a container isn't running.
+    set +e
+
     echo -e "\n${YELLOW}System Services:${NC}"
     check_service postgres 5432 "PostgreSQL"
     check_service seaweedfs 8333 "SeaweedFS"
@@ -498,6 +520,9 @@ cmd_status_human() {
     check_container "airflow-scheduler"
     check_container "airflow-triggerer"
 
+    echo -e "\n${YELLOW}Notebook Containers:${NC}"
+    check_container "jupyter" || true
+
     echo -e "\n${YELLOW}Ports:${NC}"
     echo "  PostgreSQL:       5432"
     echo "  SeaweedFS:        8333"
@@ -507,6 +532,7 @@ cmd_status_human() {
     echo "  Kafka:            9092"
     echo "  Zookeeper:        2181"
     echo "  Airflow:          8085 (UI)"
+    echo "  Jupyter:          8889"
 
     echo -e "\n${YELLOW}Configurations:${NC}"
     echo "  Spark 4.0:       docker-compose.yml"
@@ -514,8 +540,11 @@ cmd_status_human() {
     echo "  Kafka:           docker-compose-kafka.yml"
     echo "  Unity Catalog:   docker-compose-unity-catalog.yml"
     echo "  Airflow:         docker-compose-airflow.yml"
+    echo "  Notebooks:       docker-compose-notebooks.yml"
     echo "  Spark conf:      config/spark/spark-defaults.conf"
     echo "  Spark conf (UC): config/spark/spark-defaults-uc.conf.example"
+
+    set -e
 }
 
 # Status command dispatcher
@@ -620,6 +649,17 @@ check_ports_for_service() {
             ;;
     esac
 
+    case $service in
+        notebooks|jupyter|all)
+            if ! check_port_available 8889 "jupyter"; then
+                echo -e "  ${RED}✗${NC} Port 8889 (Jupyter) blocked by another process"
+                has_conflicts=1
+            else
+                echo -e "  ${GREEN}✓${NC} Port 8889 (Jupyter) available"
+            fi
+            ;;
+    esac
+
     if [ $has_conflicts -eq 1 ]; then
         echo -e "\n${RED}Port conflicts detected.${NC}"
         echo -e "${YELLOW}→ Stop conflicting services or use different ports${NC}"
@@ -645,6 +685,19 @@ cmd_start() {
     fi
     echo ""
 
+    # For `all`, bring everything up as a single compose project so service
+    # dependencies/DNS work across files.
+    if [ "$service" = "all" ]; then
+        echo -e "${YELLOW}Starting Spark $SPARK_VERSION + Kafka + Jupyter...${NC}"
+        docker compose -f "$compose_file" -f docker-compose-kafka.yml -f docker-compose-notebooks.yml up -d --build
+        echo -e "${GREEN}Jupyter available at: http://localhost:8889${NC}"
+
+        echo -e "\n${YELLOW}Waiting for services to be ready...${NC}"
+        wait_for_services
+        echo ""
+        return 0
+    fi
+
     case $service in
         spark|all)
             echo -e "${YELLOW}Starting Spark $SPARK_VERSION (port $spark_port)...${NC}"
@@ -656,6 +709,14 @@ cmd_start() {
         kafka|all)
             echo -e "${YELLOW}Starting Kafka...${NC}"
             docker compose -f docker-compose-kafka.yml up -d
+            ;;
+    esac
+
+    case $service in
+        notebooks|jupyter|all)
+            echo -e "${YELLOW}Starting Jupyter (Spark client)...${NC}"
+            docker compose -f docker-compose-notebooks.yml up -d --build
+            echo -e "${GREEN}Jupyter available at: http://localhost:8889${NC}"
             ;;
     esac
 
@@ -684,10 +745,10 @@ cmd_start() {
     esac
 
     case $service in
-        spark|kafka|all|unity-catalog|uc|airflow)
+        spark|kafka|notebooks|jupyter|all|unity-catalog|uc|airflow)
             ;;
         *)
-            echo "Usage: lakehouse start [spark|kafka|airflow|unity-catalog|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse start [spark|kafka|notebooks|airflow|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -706,6 +767,14 @@ cmd_stop() {
     local service=$1
     local compose_file=$(get_spark_compose)
 
+    # For `all`, bring everything down as a single compose project so services
+    # defined across multiple files are resolved correctly.
+    if [ "$service" = "all" ]; then
+        echo -e "${YELLOW}Stopping Spark $SPARK_VERSION + Kafka + Jupyter...${NC}"
+        docker compose -f "$compose_file" -f docker-compose-kafka.yml -f docker-compose-notebooks.yml down
+        return 0
+    fi
+
     case $service in
         spark|all)
             echo -e "${YELLOW}Stopping Spark $SPARK_VERSION...${NC}"
@@ -717,6 +786,13 @@ cmd_stop() {
         kafka|all)
             echo -e "${YELLOW}Stopping Kafka...${NC}"
             docker compose -f docker-compose-kafka.yml down
+            ;;
+    esac
+
+    case $service in
+        notebooks|jupyter|all)
+            echo -e "${YELLOW}Stopping Jupyter...${NC}"
+            docker compose -f docker-compose-notebooks.yml down
             ;;
     esac
 
@@ -735,10 +811,10 @@ cmd_stop() {
     esac
 
     case $service in
-        spark|kafka|all|unity-catalog|uc|airflow)
+        spark|kafka|notebooks|jupyter|all|unity-catalog|uc|airflow)
             ;;
         *)
-            echo "Usage: lakehouse stop [spark|kafka|airflow|unity-catalog|all] [--version 4.0|4.1]"
+            echo "Usage: lakehouse stop [spark|kafka|notebooks|airflow|unity-catalog|all] [--version 4.0|4.1]"
             exit 1
             ;;
     esac
@@ -908,6 +984,17 @@ cmd_consumer() {
     header "STARTING SPARK CONSUMER"
     local master_container=$(get_spark_master_container)
     local kafka_package
+    local docker_env_args=()
+
+    # Optional overrides for connectivity testing
+    # - KAFKA_BOOTSTRAP_SERVERS (default inside test script: kafka:29092)
+    # - KAFKA_TOPIC (default inside test script: events)
+    if [ -n "${KAFKA_BOOTSTRAP_SERVERS:-}" ]; then
+        docker_env_args+=("-e" "KAFKA_BOOTSTRAP_SERVERS=$KAFKA_BOOTSTRAP_SERVERS")
+    fi
+    if [ -n "${KAFKA_TOPIC:-}" ]; then
+        docker_env_args+=("-e" "KAFKA_TOPIC=$KAFKA_TOPIC")
+    fi
 
     case $SPARK_VERSION in
         4.0) kafka_package="org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1" ;;
@@ -916,7 +1003,7 @@ cmd_consumer() {
     esac
 
     echo -e "${YELLOW}Using Spark $SPARK_VERSION ($master_container)${NC}"
-    docker exec "$master_container" /opt/spark/bin/spark-submit \
+    docker exec "${docker_env_args[@]}" "$master_container" /opt/spark/bin/spark-submit \
         --packages "$kafka_package" \
         --conf spark.jars.ivy=/opt/spark/.ivy2 \
         /scripts/connectivity/test-kafka.py
@@ -939,10 +1026,12 @@ cmd_testdata() {
         load)
             header "LOADING TO ICEBERG"
             local master_container=$(get_spark_master_container)
+            local spark_master_url="spark://$(get_spark_master_container):$(get_spark_port)"
             if [ -f "data/load_to_iceberg.py" ]; then
                 # Copy load script to scripts dir (which is mounted in container)
                 cp data/load_to_iceberg.py scripts/_load_to_iceberg.py
                 docker exec "$master_container" /opt/spark/bin/spark-submit \
+                    --master "$spark_master_url" \
                     /scripts/_load_to_iceberg.py
                 rm -f scripts/_load_to_iceberg.py
             else
@@ -1286,8 +1375,8 @@ cmd_help() {
     echo "  preflight           Run preflight checks before starting services"
     echo "  migrate [--dry-run] Run database schema migrations"
     echo "  status              Show all services status"
-    echo "  start [service]     Start service (spark|kafka|airflow|unity-catalog|all)"
-    echo "  stop [service]      Stop service (spark|kafka|airflow|unity-catalog|all)"
+    echo "  start [service]     Start service (spark|kafka|notebooks|airflow|unity-catalog|all)"
+    echo "  stop [service]      Stop service (spark|kafka|notebooks|airflow|unity-catalog|all)"
     echo "  restart [service]   Restart service"
     echo "  logs [service]      Tail logs (spark-master|spark-worker|kafka|zookeeper|unity-catalog|airflow-*)"
     echo "  test                Run connectivity tests"
@@ -1303,9 +1392,10 @@ cmd_help() {
     echo "Services:"
     echo "  spark          Spark cluster (4.0 or 4.1)"
     echo "  kafka          Kafka + Zookeeper"
+    echo "  notebooks      Jupyter notebook server (Spark client)"
     echo "  airflow        Apache Airflow (orchestration)"
     echo "  unity-catalog  Unity Catalog OSS (Iceberg REST Catalog)"
-    echo "  all            Spark + Kafka (not Unity Catalog or Airflow)"
+    echo "  all            Spark + Kafka + notebooks (not Unity Catalog or Airflow)"
     echo ""
     echo "Spark Versions:"
     echo "  4.0 - Port 7077, UI 8080 (docker-compose.yml)"

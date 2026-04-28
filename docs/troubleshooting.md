@@ -94,8 +94,11 @@ docker run -d --name seaweedfs -p 8333:8333 -p 9333:9333 \
 **Solutions**:
 
 ```bash
-# SeaweedFS doesn't enforce credentials by default
-# Check that access keys in .env match spark-defaults.conf
+# If SeaweedFS is started with `weed server -s3` (no auth), it may reject signed S3 requests.
+# Configure Spark to use unsigned (anonymous) requests:
+#   spark.hadoop.fs.s3a.aws.credentials.provider org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider
+# and remove any `spark.hadoop.fs.s3a.access.key` / `spark.hadoop.fs.s3a.secret.key` lines from
+# `config/spark/spark-defaults.conf`.
 
 # Verify S3 connectivity
 curl http://localhost:8333
