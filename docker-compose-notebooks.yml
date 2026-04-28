@@ -25,6 +25,8 @@ services:
       - "8889:8888"
     user: root
     volumes:
+      - ./data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
       - ./notebooks:/home/jovyan/notebooks
       - ./scripts:/scripts
       - ./data:/data

@@ -44,11 +44,11 @@ services:
         tail -f /opt/spark/logs/*
       "
 
-  spark-worker-41:
+  spark-worker-41-1:
     image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
-    container_name: spark-worker-41
+    container_name: spark-worker-41-1
+    hostname: spark-worker-41-1
     env_file: .env
-    hostname: spark-worker-41
     ports:
       - "8083:8083"
     environment:
@@ -64,5 +64,28 @@ services:
       bash -c "
         sleep 5 &&
         /opt/spark/sbin/start-worker.sh spark://spark-master-41:7078 --webui-port 8083 &&
+        tail -f /opt/spark/logs/*
+        "
+
+  spark-worker-41-2:
+    image: apache/spark:4.1.0-scala2.13-java21-python3-r-ubuntu
+    container_name: spark-worker-41-2
+    hostname: spark-worker-41-2
+    env_file: .env
+    ports:
+      - "8084:8084"
+    environment:
+      - SPARK_WORKER_WEBUI_PORT=8084
+    volumes:
+      - ./data/spark:/opt/spark-data
+      - ./config/spark:/opt/spark/conf
+      - ./notebooks:/notebooks
+      - ./jars:/opt/spark/jars-extra
+      - ./scripts:/scripts
+      - ./data:/data
+    command: >
+      bash -c "
+        sleep 5 &&
+        /opt/spark/sbin/start-worker.sh spark://spark-master-41:7078 --webui-port 8084 &&
         tail -f /opt/spark/logs/*
         "
