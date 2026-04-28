@@ -714,7 +714,6 @@ lakehouse-stack/
 │   └── postgresql-*.jar
 ├── scripts/                           # PySpark examples
 ├── tests/                             # pytest suite
-└── terraform/                         # AWS infrastructure
 ```
 
 ---
@@ -726,4 +725,3 @@ lakehouse-stack/
 - [Airflow Guide](guides/airflow.md)
 - [Unity Catalog Guide](guides/unity-catalog.md)
 - [Multi-Version Spark](guides/multi-version.md)
-- [AWS Deployment](deployment/aws.md)

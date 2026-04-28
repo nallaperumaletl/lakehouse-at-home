@@ -177,4 +177,3 @@ Quick checks:
 - [Test Data Generation](../guides/test-data.md)
 - [Streaming Guide](../guides/streaming.md)
 - [Airflow Orchestration](../guides/airflow.md)
-- [AWS Deployment](aws.md) - For production

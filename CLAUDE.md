@@ -103,7 +103,6 @@ poetry run pytest -m spark41 -v                           # Spark 4.1 only
 | `scripts/testdata/` | Test data generator |
 | `tests/` | Test suite |
 | `schemas/` | Database migrations |
-| `terraform/` | AWS infrastructure |
 | `.pre-commit-config.yaml` | Security hooks |
 
 ## Architecture

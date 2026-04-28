@@ -2,6 +2,8 @@
 
 A fully open-source, self-hostable data lakehouse for local development and testing of modern data workflows. Run production-grade infrastructure on your laptop with Apache Spark, Iceberg, and Kafka - no cloud account required. Includes a realistic data generation framework to test batch and streaming pipelines.
 
+[Upstream project] Original repo owner: `lisancao` (`https://github.com/lisancao/lakehouse-at-home.git`). This fork focuses on local development and removes Terraform/cloud deployment content.
+
 [![CI](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml/badge.svg)](https://github.com/lisancao/lakehouse-at-home/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/lisancao/lakehouse-at-home)](https://github.com/lisancao/lakehouse-at-home/stargazers)
@@ -12,7 +14,7 @@ A fully open-source, self-hostable data lakehouse for local development and test
 - **Learn** data engineering with real tools, not toy examples
 - **Develop** and test Spark jobs locally before deploying to production
 - **Experiment** with Iceberg table formats, streaming pipelines, and medallion architecture
-- **Deploy** (optional) to your cloud provider when ready using included Terraform templates
+- **Deploy** to production later (cloud IaC intentionally removed from this fork)
 
 ## Stack
 
@@ -43,7 +45,7 @@ A fully open-source, self-hostable data lakehouse for local development and test
 Using Claude Code, Cursor, or another AI coding assistant? Point it at this repo:
 
 ```
-Clone https://github.com/lisancao/lakehouse-at-home and follow CLAUDE.md to set up locally.
+Clone https://github.com/nallaperumaletl/lakehouse-at-home and follow CLAUDE.md to set up locally.
 ```
 
 The agent will use `CLAUDE.md` for context and `./lakehouse setup` to validate prerequisites.
@@ -52,7 +54,7 @@ The agent will use `CLAUDE.md` for context and `./lakehouse setup` to validate p
 
 ```bash
 # Clone
-git clone https://github.com/lisancao/lakehouse-at-home.git
+git clone https://github.com/nallaperumaletl/lakehouse-at-home.git
 cd lakehouse-at-home
 
 # Setup (validates prereqs, downloads JARs, installs deps)
@@ -124,8 +126,6 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 | [Multi-Version Spark](docs/guides/multi-version.md) | Run 4.0 and 4.1 together |
 | [Unity Catalog](docs/guides/unity-catalog.md) | REST catalog setup & migration |
 | [Architecture](docs/architecture.md) | System design |
-| [AWS Deployment](docs/deployment/aws.md) | Cloud production setup |
-| [Databricks Deployment](docs/deployment/databricks.md) | Managed Spark platform |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
 | [Security](SECURITY.md) | Security guidelines for contributors |
 | [AI Skills](https://github.com/lisancao/lakehouse-skills) | AI assistant references (SDP, etc.) |
@@ -212,25 +212,7 @@ See [Test Data Guide](docs/guides/test-data.md) for details.
 
 ## Cloud Deployment
 
-### AWS (EMR + S3 + RDS)
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply
-```
-
-See [AWS Deployment Guide](docs/deployment/aws.md) | Estimated: $50-500/month
-
-### Databricks
-
-```bash
-cd terraform-databricks
-cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply
-```
-
-See [Databricks Deployment Guide](docs/deployment/databricks.md) | Estimated: $100-800/month
+Terraform/cloud deployment templates are excluded from this fork.
 
 ## Testing
 

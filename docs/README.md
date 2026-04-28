@@ -11,8 +11,6 @@ Welcome to the Lakehouse Stack documentation. This guide covers everything you n
 | [Data Pipelines](guides/pipelines.md) | Build medallion pipelines (imperative vs declarative) |
 | [Airflow Orchestration](guides/airflow.md) | Workflow orchestration with Apache Airflow |
 | [CLI Reference](guides/cli-reference.md) | All available commands |
-| [AWS Deployment](deployment/aws.md) | Deploy to production on AWS |
-| [Databricks Deployment](deployment/databricks.md) | Deploy to Databricks |
 | [Unity Catalog](guides/unity-catalog.md) | Alternative catalog with REST API |
 
 ## What is Lakehouse Stack?
@@ -43,8 +41,6 @@ docs/
 │   └── unity-catalog.md    # Unity Catalog OSS integration
 ├── deployment/
 │   ├── local.md            # Local development setup
-│   ├── aws.md              # AWS production deployment
-│   └── databricks.md       # Databricks deployment
 ├── architecture.md         # System design and data flow
 └── troubleshooting.md      # Common issues and solutions
 ```
